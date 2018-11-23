@@ -1,0 +1,8 @@
+# Ignore BUILD folder
+build/
+
+# Ignore user config-file
+dicom/config.ini
+
+# Ignore MAC DS_STORE
+.DS_STORE
