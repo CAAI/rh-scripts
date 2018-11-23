@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-from pythontoolkit.conversion import dcm_to_mnc
+from rhscripts.conversion import dcm_to_mnc
 
 parser = argparse.ArgumentParser(description='Convert DICOM to MINC')
 
