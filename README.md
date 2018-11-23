@@ -1,11 +1,12 @@
 # rh-scripts
 
 ## HOW TO INSTALL
+```
 pip3 install -r requirements.txt
 mkdir build
 cd build
 cmake ..
 make install
-
+```
 ## POST INSTALLATION
 Add "source /opt/rhscripts/toolkit-config.sh" to bashrc / bash_profile 
