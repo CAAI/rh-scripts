@@ -8,4 +8,4 @@ INSTALL(PROGRAMS
   version.py  
   conversion.py
 
-  DESTINATION lib )
+  DESTINATION rhscripts )
