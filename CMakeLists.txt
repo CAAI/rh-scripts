@@ -8,6 +8,7 @@ ADD_SUBDIRECTORY( pythontoolkit )
 
 INSTALL(PROGRAMS conversion/dicom_to_minc.py
 	conversion/rtx2mnc.py
+	conversion/mnc2dcm.py
   PERMISSIONS
     OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ
   DESTINATION
