@@ -33,7 +33,7 @@ def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
     >>>     print("Found files in folderA")
     Found files in folderA
     """
-    counts = np.zeros((1,len(extensions)))
+    counts = [0]*len(extensions)
     c = 0
     for ext in extensions:
         files = glob.glob(os.path.join(sourcedir,'*' + ext) )

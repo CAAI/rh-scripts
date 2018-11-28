@@ -11,3 +11,16 @@ make install
 ```
 ## POST INSTALLATION
 Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
+
+## KNOWN ISSUES
+
+### Install on ubuntu
+sudo make install gives error on install_manifest.txt
+
+#### Solution:
+Prior to install run:
+```
+sudo mkdir /opt/caai
+sudo chown -R <user>:<group> /opt/caai
+```
+Proceed to install with "make install" without sudo.
