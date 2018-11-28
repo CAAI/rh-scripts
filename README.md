@@ -1,5 +1,5 @@
 # rh-scripts
-# Scripts used at CAAI group at Rigshospitalet
+Scripts used at CAAI group at Rigshospitalet
 
 ## HOW TO INSTALL
 ```

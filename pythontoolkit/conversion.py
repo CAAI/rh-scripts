@@ -14,19 +14,22 @@ def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
     Parameters
     ----------
     sourcedir : string
-        Path to the directory to crawl for files with extensions
+        Path to the directory to look for files with extensions
     extensions : string list, optional
         Extensions to look for, each mutually exclusive
 
     Notes
     -----
-    If none of the folders in sourcedir contains the extensions
+    If none of the folders in sourcedir contains the extensions, it will fail.
 
     Examples
     --------
-    >>> import numpy.matlib
+    >>> from rhscripts.conversion import findExtension
+    >>> if findExtension('folderA') != -1:
+    >>>     print("Found files in folderA")
+    Found files in folderA
     """
-    counts = [0,0,0,0]
+    counts = np.zeros((1,len(extensions)))
     c = 0
     for ext in extensions:
         files = glob.glob(os.path.join(sourcedir,'*' + ext) )
@@ -38,6 +41,23 @@ def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
         return extensions[counts.index(max(counts))]
 
 def look_for_dcm_files(folder):
+    """Return first folder found with one of the extensions, 
+    or -1 no files were found, or if more than one type of extension is found
+
+    Parameters
+    ----------
+    folder : string
+        Path to the directory to crawl for files with extensions
+
+    Notes
+    -----
+    Only the path to the first occurence of files will be returned
+
+    Examples
+    --------
+    >>> from rhscripts.conversion import look_for_dcm_files
+    >>> dicomfolder = look_for_dcm_files('folderA')
+    """
 	if findExtension(folder) != -1:
 		return folder
 	for root,subdirs,files in os.walk(folder):
@@ -50,6 +70,32 @@ def look_for_dcm_files(folder):
 	return -1
 		
 def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFileEndings=True):
+    """Convert a folder with dicom files to minc
+
+    Parameters
+    ----------
+    folder : string
+        Path to the directory to crawl for files
+    target : string, optional
+        Path to the install prefix
+    fname : string, optional
+        Name of the minc file, if not set, use minc-toolkit default
+    dname : string, optional
+        Name of the folder to place the minc file into, if not set, use minc-toolkit default
+    verbose : boolean, optional
+        Set the verbosity
+    checkForFileEndings : boolean, optional
+        If set, crawl for a folder with dicom file endings, otherwise just use input
+
+    Notes
+    -----
+    
+
+    Examples
+    --------
+    >>> from rhscripts.conversion import dcm_to_mnc
+    >>> dcm_to_mnc('folderA',target='folderB',fname='PETCT',dname='mnc',checkForFileEndings=False)
+    """
 	dcmcontainer = look_for_dcm_files(folder) if checkForFileEndings else folder
 	
 	if dcmcontainer == -1:
@@ -68,6 +114,32 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
 	os.system(cmd)
 
 def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,id=None):  
+    """Convert a minc file to dicom
+
+    Parameters
+    ----------
+    mncfile : string
+        Path to the minc file
+    dicomcontainer : string
+        Path to the directory containing the dicom container
+    dicomfolder : string
+        Path to the output dicom folder
+    verbose : boolean, optional
+        Set the verbosity
+    modify : boolean, optional
+        Create new SeriesInstanceUID and SOPInstanceUID
+        Default on if description or id is set
+    description : string, optional
+        Sets the SeriesDescription tag in the dicom files
+    id : int, optional
+        Sets the SeriesNumber tag in the dicom files
+
+    Examples
+    --------
+    >>> from rhscripts.conversion import mnc_to_dcm
+    >>> mnc_to_dcm('PETCT_new.mnc','PETCT','PETCT_new',description="PETCT_new",id="600")
+    """
+
     ## TODO
     # Add slope and intercept
     # Fix max in numpy conversion
