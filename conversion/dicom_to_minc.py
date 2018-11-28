@@ -28,3 +28,6 @@ if not args.dicom:
 	exit(-1)
 
 dcm_to_mnc(args.dicom,target=target,fname=args.fname,dname=args.dname)
+
+
+
