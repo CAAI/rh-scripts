@@ -9,4 +9,4 @@ cmake ..
 make install
 ```
 ## POST INSTALLATION
-Add "source /opt/rhscripts/toolkit-config.sh" to bashrc / bash_profile 
+Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
