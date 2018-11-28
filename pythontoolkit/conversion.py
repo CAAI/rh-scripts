@@ -334,7 +334,6 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
             # Create one MNC output file per ROI
             RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
-            print("pyminc.volumeLikeFile ", mnc_container_file, ",",RTMINC_outname) 
             RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
             contour_sequences = ROI.ContourSequence
 
