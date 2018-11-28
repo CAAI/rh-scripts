@@ -2,7 +2,7 @@ project (rh-scripts)
 
 cmake_minimum_required (VERSION 2.8)
 
-set( CMAKE_INSTALL_PREFIX "/opt/rhscripts" )
+set( CMAKE_INSTALL_PREFIX "/opt/caai" )
 
 ADD_SUBDIRECTORY( pythontoolkit )
 
