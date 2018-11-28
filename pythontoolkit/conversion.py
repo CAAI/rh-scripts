@@ -8,6 +8,8 @@ except ImportError:
 import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
+import cv2
+
 
 from rhscripts.utils import listdir_nohidden
 
@@ -278,7 +280,7 @@ def dosedcm_to_mnc(dcmfile,mncfile):
         raise IOError("Cannot determine slicethickness!")
     steps.append(dz)
     
-    #reorder the starts and steps! OBS hardcoded stuff!
+    #reorder the starts and steps!
     myorder = [2,1,0]
     starts = [ starts[i] for i in myorder]
     myorder = [2,0,1]
@@ -294,3 +296,103 @@ def dosedcm_to_mnc(dcmfile,mncfile):
     out_vol = pyminc.volumeFromData(mncfile,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
     out_vol.writeFile() 
     out_vol.closeVolume() 
+
+def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False):
+    
+    """Convert dcm file (RT struct) to minc file
+
+    Parameters
+    ----------
+    dcmfile : string
+        Path to the dicom file (RT struct)    
+    mnc_container_file : string
+        Path to the minc file that is the container of the RT struct
+    mnc_output_file : string
+        Path to the minc output file
+    verbose : boolean, optional
+        Default = Flase (if true, print info)
+    copy_name : boolean, optional
+        Default = Flase, If true the ROI name from Mirada is store in Minc header
+    Examples
+    --------
+    >>> from rhscripts.conversion import rtx_to_mnc
+    >>> rtx_to_mnc('RTstruct.dcm',PET.mnc','RTstruct.mnc',verbose=False,copy_name=True)
+    """
+
+    try:
+        RTSS = dicom.read_file(dcmfile) 
+        print(RTSS.StructureSetROISequence[0].ROIName)
+        ROIs = RTSS.ROIContourSequence
+
+        if verbose:
+            print("Found",len(ROIs),"ROIs")
+
+        volume = pyminc.volumeFromFile(mnc_container_file)
+
+        for ROI_id,ROI in enumerate(ROIs):
+
+            # Create one MNC output file per ROI
+            RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
+            RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+            contour_sequences = ROI.ContourSequence
+
+            if verbose:
+                print(" --> Found",len(contour_sequences),"contour sequences for ROI:",RTSS.StructureSetROISequence[ROI_id].ROIName)
+
+            for contour in contour_sequences:
+                assert contour.ContourGeometricType == "CLOSED_PLANAR"
+
+                current_slice_i_print = 0
+                
+                if verbose:
+                    print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
+
+                world_coordinate_points = np.array(contour.ContourData)
+                world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
+                current_slice = np.zeros((volume.getSizes()[1],volume.getSizes()[2]))
+                voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
+                current_slice_i = 0
+                for wi,world in enumerate(world_coordinate_points):
+                    voxel = volume.convertWorldToVoxel([-world[0],-world[1],world[2]])
+                    current_slice_i = voxel[0]
+                    voxel_coordinates_inplane[wi,:] = [voxel[2],voxel[1]]
+                current_slice_inner = np.zeros((volume.getSizes()[1],volume.getSizes()[2]),dtype=np.float)
+                converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
+                cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
+                p = Path(voxel_coordinates_inplane)
+                points = np.array(np.nonzero(current_slice_inner)).T
+                grid = p.contains_points(points[:,[1,0]])
+                # for pi,point in enumerate(points):
+                #     if not grid[pi]:
+                #         # REMOVE EDGE POINT BECAUSE CENTER IS NOT INCLUDED
+                #         current_slice_inner[point[0],point[1]] = 0 
+
+                #         if args.visualize:
+                #             plt.plot(point[1],point[0],'bx')
+
+                #     elif args.visualize:
+                #         plt.plot(point[1],point[0],'bo')
+
+                # if args.visualize:
+                #     plt.imshow(current_slice_inner)
+                #     plt.plot(voxel_coordinates_inplane[:,0],voxel_coordinates_inplane[:,1],'ro')
+                #     plt.show()
+
+                RTMINC.data[int(round(current_slice_i))] += current_slice_inner 
+
+
+            # Remove even areas - implies a hole.
+            RTMINC.data[RTMINC.data % 2 == 0] = 0
+
+            RTMINC.writeFile()
+            RTMINC.closeVolume()
+
+            if copy_name:
+                print('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
+                os.system('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
+
+        volume.closeVolume()
+
+except InvalidDicomError:
+    print("Could not read DICOM RTX file",args.RTX)
+    exit(-1)

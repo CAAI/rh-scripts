@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+import argparse
+from rhscripts.conversion import dcm_to_mnc
+from rhscripts.version import __show_version__
 
 import numpy as np
 try:
