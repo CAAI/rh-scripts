@@ -7,5 +7,6 @@ INSTALL(PROGRAMS
   __init__.py
   version.py  
   conversion.py
+  utils.py
 
   DESTINATION rhscripts )

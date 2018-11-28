@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
-import os
+import os, glob
 try:
     import pydicom as dicom
 except ImportError:
     import dicom
+import pyminc.volumes.factory as pyminc
+import numpy as np
+import datetime
 
+from rhscripts.utils import listdir_nohidden
 
 def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
     """Return the number of files with one of the extensions, 
@@ -58,17 +62,17 @@ def look_for_dcm_files(folder):
     >>> from rhscripts.conversion import look_for_dcm_files
     >>> dicomfolder = look_for_dcm_files('folderA')
     """
-	if findExtension(folder) != -1:
-		return folder
-	for root,subdirs,files in os.walk(folder):
-		if len(subdirs) > 0:
-			continue
-		if not len(files) > 0:
-			continue
-		if findExtension(root) != -1:
-			return root
-	return -1
-		
+    if findExtension(folder) != -1:
+        return folder
+    for root,subdirs,files in os.walk(folder):
+        if len(subdirs) > 0:
+            continue
+        if not len(files) > 0:
+            continue
+        if findExtension(root) != -1:
+            return root
+    return -1
+        
 def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFileEndings=True):
     """Convert a folder with dicom files to minc
 
@@ -96,22 +100,23 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
     >>> from rhscripts.conversion import dcm_to_mnc
     >>> dcm_to_mnc('folderA',target='folderB',fname='PETCT',dname='mnc',checkForFileEndings=False)
     """
-	dcmcontainer = look_for_dcm_files(folder) if checkForFileEndings else folder
-	
-	if dcmcontainer == -1:
-		print("Could not find dicom files in container..")
-		exit(-1)
+    dcmcontainer = look_for_dcm_files(folder) if checkForFileEndings else folder
+    
+    if dcmcontainer == -1:
+        print("Could not find dicom files in container..")
+        exit(-1)
 
-	cmd = 'dcm2mnc -usecoordinates -clobber '+dcmcontainer+'/* '+target
-	if not fname is None:
-		cmd += ' -fname "'+fname+'"'
-	if not dname is None:
-		cmd += ' -dname '+dname
+    cmd = 'dcm2mnc -usecoordinates -clobber '+dcmcontainer+'/* '+target
+    if not fname is None:
+        cmd += ' -fname "'+fname+'"'
+    if not dname is None:
+        cmd += ' -dname '+dname
 
-	if verbose:
-		print("Command %s" % cmd)
+    if verbose:
+        print("Command %s" % cmd)
 
-	os.system(cmd)
+    os.system(cmd)
+
 
 def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,id=None):  
     """Convert a minc file to dicom
@@ -159,7 +164,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile).decode('utf8'))
     except AttributeError:
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
-    minc = volumeFromFile(mncfile)
+    minc = pyminc.volumeFromFile(mncfile)
     SmallestImagePixelValue = minc.data.min()
     LargestImagePixelValue = minc.data.max()
     np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
@@ -167,9 +172,9 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
 
     ## Prepare for MODIFY HEADER
     try:
-        newSIUID = unicode(datetime.datetime.now())
+        newSIUID = unicode(datetime.datetime.now()) # Python2
     except:
-        newSIUID = str(datetime.datetime.now())
+        newSIUID = str(datetime.datetime.now()) #Python3
     newSIUID = newSIUID.replace("-","")
     newSIUID = newSIUID.replace(" ","")
     newSIUID = newSIUID.replace(":","")
@@ -223,9 +228,9 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
                 ds.SeriesNumber = id
 
             try:
-                newSOP = unicode(datetime.datetime.now())
+                newSOP = unicode(datetime.datetime.now())  # Python2
             except:
-                newSOP = str(datetime.datetime.now())
+                newSOP = str(datetime.datetime.now())  # Python3
             
             newSOP = newSOP.replace("-","")
             newSOP = newSOP.replace(" ","")
