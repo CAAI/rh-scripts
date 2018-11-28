@@ -167,3 +167,60 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
 
     if verbose:
         print("Output written to %s" % dicomfolder)
+
+
+def dosedcm_to_mnc(dcm,mnc):
+    """
+    Created on Nov 28 2018
+    Author: Anders Olin ( anders.olin@regionh.dk )
+
+    ###
+
+    Script to convert RD dose distributions to MINC
+    -----------------------------------------------------------------
+    usage: rtdose2mnc.py [-h] file.dcm file.mnc
+
+    Convert DICOM to MINC
+
+    positional arguments:
+      file_dcm     Input (RD) DICOM file
+      file_mnc     Output MINC file
+
+    optional arguments:
+      -h, --help   show this help message and exit
+      --name NAME  Name instead of patient name
+
+    -----------------------------------------------------------------
+
+    """
+
+    # Load the dicom
+    ds = pydicom.dcmread(dcm)
+    
+    # Extract the starts and steps of the x,y,z space
+    starts = ds.ImagePositionPatient
+    steps = [float(i) for i in ds.PixelSpacing];
+    if not (ds.SliceThickness==''):
+        dz = ds.SliceThickness
+    elif 'GridFrameOffsetVector' in ds: 
+        dz = ds.GridFrameOffsetVector[1] -ds.GridFrameOffsetVector[0]
+    else:
+        raise IOError("Cannot determine slicethickness!")
+    steps.append(dz)
+    
+    #reorder the starts and steps
+    myorder = [2,1,0]
+    starts = [ starts[i] for i in myorder]
+    myorder = [2,0,1]
+    steps = [ steps[i] for i in myorder]
+    #change the sign (e.g. starts=[1,-1,-1].*starts)
+    starts = [a*b for a,b in zip([1,-1,-1],starts)]
+    steps = [a*b for a,b in zip([1,-1,-1],steps)]
+    
+    #Get the pixel data and scale it correctly
+    dose_array = ds.pixel_array*float(ds.DoseGridScaling)
+    
+    # Write the output minc file
+    out_vol = pyminc.volumeFromData(mnc,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
+    out_vol.writeFile() 
+    out_vol.closeVolume() 
