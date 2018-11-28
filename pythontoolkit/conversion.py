@@ -277,7 +277,7 @@ def dosedcm_to_mnc(dcmfile,mncfile):
         raise IOError("Cannot determine slicethickness!")
     steps.append(dz)
     
-    #reorder the starts and steps
+    #reorder the starts and steps! OBS hardcoded stuff!
     myorder = [2,1,0]
     starts = [ starts[i] for i in myorder]
     myorder = [2,0,1]

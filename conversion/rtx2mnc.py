@@ -44,26 +44,26 @@ if args.version:
 	print('%s version: %s' % (__scriptname__,__version__))
 	exit(-1)
 
-if not args.RTX or not args.MINC or not args.RTMINC:
+if not dcmfile or not mnc_container_file or not mnc_output_file:
 	parser.print_help()
 	print('Too few arguments')
 	exit(-1)
 
 try:
-	RTSS = dicom.read_file(args.RTX) 
+	RTSS = dicom.read_file(dcmfile) 
 	print(RTSS.StructureSetROISequence[0].ROIName)
 	ROIs = RTSS.ROIContourSequence
 
 	if args.verbose:
 		print("Found",len(ROIs),"ROIs")
 
-	volume = pyminc.volumeFromFile(args.MINC)
+	volume = pyminc.volumeFromFile(mnc_container_file)
 
 	for ROI_id,ROI in enumerate(ROIs):
 
 		# Create one MNC output file per ROI
-		RTMINC_outname = args.RTMINC if len(ROIs) == 1 else args.RTMINC[:-4] + "_" + str(ROI_id) + ".mnc"
-		RTMINC = pyminc.volumeLikeFile(args.MINC,RTMINC_outname)
+		RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
+		RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
 		contour_sequences = ROI.ContourSequence
 
 		if args.verbose:
