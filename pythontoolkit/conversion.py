@@ -9,7 +9,7 @@ import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
 import cv2
-
+from pydicom.filereader import InvalidDicomError #For rtx2mnc
 
 from rhscripts.utils import listdir_nohidden
 
@@ -249,7 +249,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         print("Output written to %s" % dicomfolder)
 
 
-def dosedcm_to_mnc(dcmfile,mncfile):
+def rtdose_to_mnc(dcmfile,mncfile):
     
     """Convert dcm file (RD dose distribution) to minc file
 
@@ -262,8 +262,8 @@ def dosedcm_to_mnc(dcmfile,mncfile):
 
     Examples
     --------
-    >>> from rhscripts.conversion import dosedcm_to_mnc
-    >>> dosedcm_to_mnc('RD.dcm',RD.mnc')
+    >>> from rhscripts.conversion import rtdose_to_mnc
+    >>> rtdose_to_mnc('RD.dcm',RD.mnc')
     """
 
     # Load the dicom
@@ -329,10 +329,12 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
         volume = pyminc.volumeFromFile(mnc_container_file)
 
+
         for ROI_id,ROI in enumerate(ROIs):
 
             # Create one MNC output file per ROI
             RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
+            print("pyminc.volumeLikeFile ", mnc_container_file, ",",RTMINC_outname) 
             RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
             contour_sequences = ROI.ContourSequence
 
@@ -359,26 +361,9 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
                 current_slice_inner = np.zeros((volume.getSizes()[1],volume.getSizes()[2]),dtype=np.float)
                 converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
                 cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
-                p = Path(voxel_coordinates_inplane)
-                points = np.array(np.nonzero(current_slice_inner)).T
-                grid = p.contains_points(points[:,[1,0]])
-                # for pi,point in enumerate(points):
-                #     if not grid[pi]:
-                #         # REMOVE EDGE POINT BECAUSE CENTER IS NOT INCLUDED
-                #         current_slice_inner[point[0],point[1]] = 0 
 
-                #         if args.visualize:
-                #             plt.plot(point[1],point[0],'bx')
-
-                #     elif args.visualize:
-                #         plt.plot(point[1],point[0],'bo')
-
-                # if args.visualize:
-                #     plt.imshow(current_slice_inner)
-                #     plt.plot(voxel_coordinates_inplane[:,0],voxel_coordinates_inplane[:,1],'ro')
-                #     plt.show()
-
-                RTMINC.data[int(round(current_slice_i))] += current_slice_inner 
+                RTMINC.data[int(round(current_slice_i))] += current_slice_inner
+                
 
 
             # Remove even areas - implies a hole.
@@ -393,6 +378,6 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
         volume.closeVolume()
 
-except InvalidDicomError:
-    print("Could not read DICOM RTX file",args.RTX)
-    exit(-1)
+    except InvalidDicomError:
+        print("Could not read DICOM RTX file",args.RTX)
+        exit(-1)

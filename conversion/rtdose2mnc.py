@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-from rhscripts.conversion import dosedcm_to_mnc
+from rhscripts.conversion import rtdose_to_mnc
 from rhscripts.version import __show_version__
 
 __scriptname__ = 'rtdose2mnc'
@@ -24,4 +24,4 @@ if not args.file_dcm or not args.file_mnc:
     print('Too few arguments')
     exit(-1)
 
-dosedcm_to_mnc(args.file_dcm,args.file_mnc)
+rtdose_to_mnc(args.file_dcm,args.file_mnc)
