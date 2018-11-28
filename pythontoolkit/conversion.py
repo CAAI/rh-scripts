@@ -169,7 +169,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
     minc = pyminc.volumeFromFile(mncfile)
     SmallestImagePixelValue = minc.data.min()
-    LargestImagePixelValue = minc.data.max()
+    LargestImagePixelValue = int(minc.data.max())
     np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
     minc.closeVolume()
 

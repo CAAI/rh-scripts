@@ -8,5 +8,6 @@ INSTALL(PROGRAMS
   version.py  
   conversion.py
   utils.py
+  dicom.py
 
   DESTINATION rhscripts )

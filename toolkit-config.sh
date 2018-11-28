@@ -1,5 +1,5 @@
 # rh-script configuration 
-export RH_SCRIPTS=/opt/caai
+export CAAI=/opt/caai
 
-export PATH=${RH_SCRIPTS}/bin:${PATH}
-export PYTHONPATH=${RH_SCRIPTS}:${PYTHONPATH}
+export PATH=${CAAI}/bin:${PATH}
+export PYTHONPATH=${CAAI}:${PYTHONPATH}
