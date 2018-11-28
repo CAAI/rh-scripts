@@ -146,9 +146,10 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     """
 
     ## TODO
-    # Add slope and intercept
+    # Add slope and intercept (e.g. for PET)
     # Fix max in numpy conversion
     # 4D MRI
+    # time series data
     
     if description or id:
         modify = True
