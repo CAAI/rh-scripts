@@ -6,6 +6,7 @@ from rhscripts.version import __show_version__
 __scriptname__ = 'rtdose2mnc'
 __version__ = '0.0.1'
 
+
 parser = argparse.ArgumentParser(description='Convert RD DICOM (dose distribution) to MINC')
 parser.add_argument('file_dcm', type=str, help='The input RD DICOM file', nargs='?')
 parser.add_argument('file_mnc', type=str, help='The output MINC file', nargs='?')
