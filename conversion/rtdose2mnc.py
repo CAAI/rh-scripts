@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-
-
-# % Import stuff
-import os, sys, argparse
-import pydicom
-import pyminc.volumes.factory as pyminc
-import numpy as np
+import argparse
 from rhscripts.conversion import dosedcm_to_mnc
+from rhscripts.version import __show_version__
 
-__scriptname__ = 'rtmnc'
+__scriptname__ = 'rtdose2mnc'
 __version__ = '0.0.1'
-    
 
 parser = argparse.ArgumentParser(description='Convert RD DICOM (dose distribution) to MINC')
 parser.add_argument('file_dcm', type=str, help='The input RD DICOM file', nargs='?')
@@ -26,7 +18,7 @@ if args.version:
     __show_version__()
     exit(-1)
 
-if not args.file_dcm or not args.file_mnc 
+if not args.file_dcm or not args.file_mnc:
     parser.print_help()
     print('Too few arguments')
     exit(-1)

@@ -241,33 +241,25 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         print("Output written to %s" % dicomfolder)
 
 
-def dosedcm_to_mnc(dcm,mnc):
-    """
-    Created on Nov 28 2018
-    Author: Anders Olin ( anders.olin@regionh.dk )
+def dosedcm_to_mnc(dcmfile,mncfile):
+    
+    """Convert dcm file (RD dose distribution) to minc file
 
-    ###
+    Parameters
+    ----------
+    dcmfile : string
+        Path to the dicom file (RD type)    
+    mncfile : string
+        Path to the minc file
 
-    Script to convert RD dose distributions to MINC
-    -----------------------------------------------------------------
-    usage: rtdose2mnc.py [-h] file.dcm file.mnc
-
-    Convert DICOM to MINC
-
-    positional arguments:
-      file_dcm     Input (RD) DICOM file
-      file_mnc     Output MINC file
-
-    optional arguments:
-      -h, --help   show this help message and exit
-      --name NAME  Name instead of patient name
-
-    -----------------------------------------------------------------
-
+    Examples
+    --------
+    >>> from rhscripts.conversion import dosedcm_to_mnc
+    >>> dosedcm_to_mnc('RD.dcm',RD.mnc')
     """
 
     # Load the dicom
-    ds = pydicom.dcmread(dcm)
+    ds = dicom.dcmread(dcmfile)
     
     # Extract the starts and steps of the x,y,z space
     starts = ds.ImagePositionPatient
@@ -293,6 +285,6 @@ def dosedcm_to_mnc(dcm,mnc):
     dose_array = ds.pixel_array*float(ds.DoseGridScaling)
     
     # Write the output minc file
-    out_vol = pyminc.volumeFromData(mnc,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
+    out_vol = pyminc.volumeFromData(mncfile,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
     out_vol.writeFile() 
     out_vol.closeVolume() 
