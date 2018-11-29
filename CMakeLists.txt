@@ -18,9 +18,8 @@ INSTALL(PROGRAMS conversion/dicom_to_minc.py
     bin )
     
 # Move config file, if it exists, to share folder
-if(EXISTS "dicom/config.ini")
-    INSTALL(FILES dicom/config.ini DESTINATION share)
-endif()
+INSTALL(FILES dicom/config-default.ini DESTINATION share)
 
 # Install PATH and PYTHONPATH configuration file
-INSTALL(FILES toolkit-config.sh DESTINATION .)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/toolkit-config.sh.cmake ${CMAKE_CURRENT_BINARY_DIR}/toolkit-config.sh @ONLY)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/toolkit-config.sh DESTINATION .)
