@@ -2,7 +2,9 @@ project (rh-scripts)
 
 cmake_minimum_required (VERSION 2.8)
 
-set( CMAKE_INSTALL_PREFIX "/opt/caai" )
+if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set (CMAKE_INSTALL_PREFIX "/opt/caai" CACHE PATH "default install path" FORCE )
+endif()
 
 # Add python-lib
 ADD_SUBDIRECTORY( pythontoolkit )
