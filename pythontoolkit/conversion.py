@@ -9,7 +9,7 @@ import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
 import cv2
-from pydicom.filereader import InvalidDicomError #For rtx2mnc
+from dicom.filereader import InvalidDicomError #For rtx2mnc
 
 from rhscripts.utils import listdir_nohidden
 
