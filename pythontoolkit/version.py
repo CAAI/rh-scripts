@@ -1,4 +1,4 @@
-version = '0.0.7'
+version = '0.0.8'
 git_revision = ''
 
 """
@@ -11,6 +11,7 @@ VERSIONING
   0.0.5 # Added combability for UBUNTU pydicom in conversion
   0.0.6 # Added dicom as toolkit option
   0.0.7 # Added rtdose_to_mnc and rtx_to_mnc
+  0.0.8 # Fixed bug with dicom toolkit conflicting with pydicom when installed with version < 1.0
 
 """
 
