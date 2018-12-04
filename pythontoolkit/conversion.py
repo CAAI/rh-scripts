@@ -3,13 +3,15 @@
 import os, glob
 try:
     import pydicom as dicom
+    from pydicom.filereader import InvalidDicomError #For rtx2mnc
 except ImportError:
     import dicom
+    from dicom.filereader import InvalidDicomError #For rtx2mnc
 import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
 import cv2
-from dicom.filereader import InvalidDicomError #For rtx2mnc
+
 
 from rhscripts.utils import listdir_nohidden
 
