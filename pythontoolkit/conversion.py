@@ -211,7 +211,8 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     ## END OF UKNOWN
 
     # Create output folder
-    os.makedirs(dicomfolder, exist_ok=True)
+    if not os.path.exists(dicomfolder):
+        os.mkdir(dicomfolder)
 
     # List files, do not need to be ordered
     for f in listdir_nohidden(dcmcontainer):
