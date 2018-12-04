@@ -122,7 +122,7 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
     os.system(cmd)
 
 
-def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,id=None):  
+def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None):  
     """Convert a minc file to dicom
 
     Parameters
@@ -155,7 +155,10 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     # 4D MRI
     # time series data
     
-    if description or id:
+    if verbose:
+        print("Converting to DICOM")
+
+    if description or study_id:
         modify = True
     
     dcmcontainer = look_for_dcm_files(dicomcontainer)
@@ -163,17 +166,20 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         print("Could not find dicom files in container..")
         exit(-1)
 
-    #print dcmcontainer,listdir_nohidden(dcmcontainer)
+    # Get information about the dataset from a single file
     firstfile = listdir_nohidden(dcmcontainer)[0]
     try:
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile).decode('utf8'))
     except AttributeError:
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
+    # Load the minc file
     minc = pyminc.volumeFromFile(mncfile)
     SmallestImagePixelValue = minc.data.min()
     LargestImagePixelValue = int(minc.data.max())
     np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
     minc.closeVolume()
+    # Check that the correct number of files exists
+    assert len(listdir_nohidden(dcmcontainer)) == np_minc.shape[0]
 
     ## Prepare for MODIFY HEADER
     try:
@@ -186,33 +192,25 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     newSIUID = newSIUID.replace(".","")
     newSIUID = '1.3.12.2.1107.5.2.38.51014.' + str(newSIUID) + '11111.0.0.0' 
 
+    ## UNKNOWN WHY THIS IS HERE - REMOVE?
     negative_handled = False
     if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
         if verbose:
             print("Ran into negative values in uint16 dtype, clamping to 0")
         np_minc = np.maximum( np_minc, 0 )
         negative_handled = True
-
     if verbose and SmallestImagePixelValue < 0 and not negative_handled:
         print("Unhandled dtype for negative values: %s" % ds.pixel_array.dtype)
-
     if np.max(np_minc) > LargestImagePixelValue:
         if verbose:
             print("Maximum value exceeds LargestImagePixelValue - setting to zero")
         np_minc[ np.where( np_minc > LargestImagePixelValue ) ] = 0
+    ## END OF UKNOWN
 
-    if not os.path.exists(dicomfolder):
-        os.mkdir(dicomfolder)
+    # Create output folder
+    os.makedirs(dicomfolder, exist_ok=True)
 
-    #print len(listdir_nohidden(dcmcontainer)) , np_minc.shape[0]
-    assert len(listdir_nohidden(dcmcontainer)) == np_minc.shape[0]
-
-    if verbose:
-            print("Converting to DICOM")
-    if modify:
-        if verbose:
-            print("Modifying DICOM headers")
-
+    # List files, do not need to be ordered
     for f in listdir_nohidden(dcmcontainer):
         try:
             ds=dicom.read_file(os.path.join(dcmcontainer,f).decode('utf8'))
@@ -220,29 +218,38 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
             ds=dicom.read_file(os.path.join(dcmcontainer,f))
         i = int(ds.InstanceNumber)-1
 
+        # Check inplane-dimension is the same
         assert ds.pixel_array.shape == (np_minc.shape[1],np_minc.shape[2])
 
-        ds.LargestImagePixelValue = LargestImagePixelValue
+        # Insert pixel-data
         ds.PixelData = np_minc[i,:,:].tostring()
 
         if modify:
-            ds.SeriesInstanceUID = newSIUID
+            if verbose:
+                print("Modifying DICOM headers")
+
+            # Set information if given
             if not description == None:
                 ds.SeriesDescription = description
-            if not id == None:
-                ds.SeriesNumber = id
+            if not study_id == None:
+                ds.SeriesNumber = study_id
 
+            # Update SOP - unique per file
             try:
                 newSOP = unicode(datetime.datetime.now())  # Python2
             except:
                 newSOP = str(datetime.datetime.now())  # Python3
-            
             newSOP = newSOP.replace("-","")
             newSOP = newSOP.replace(" ","")
             newSOP = newSOP.replace(":","")
             newSOP = newSOP.replace(".","")
             newSOP = '1.3.12.2.1107.5.2.38.51014.' + str(newSOP) + str(i+1)
             ds.SOPInstanceUID = newSOP
+
+            ds.LargestImagePixelValue = LargestImagePixelValue # Moved this line into modify - should it be outside?
+
+            # Same for all files
+            ds.SeriesInstanceUID = newSIUID
 
         fname = "dicom_%04d.dcm" % int(ds.InstanceNumber)
         ds.save_as(os.path.join(dicomfolder,fname))
