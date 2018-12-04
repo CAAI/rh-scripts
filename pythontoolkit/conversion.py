@@ -177,11 +177,12 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
     # Load the minc file
     minc = pyminc.volumeFromFile(mncfile)
-    SmallestImagePixelValue = minc.data.min()
     LargestImagePixelValue = int(minc.data.max())
     np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
     minc.closeVolume()
     # Check that the correct number of files exists
+    if verbose:
+        print("Checking files ( %d ) equals number of slices ( %d )" % (len(listdir_nohidden(dcmcontainer)), np_minc.shape[0]))
     assert len(listdir_nohidden(dcmcontainer)) == np_minc.shape[0]
 
     ## Prepare for MODIFY HEADER
@@ -196,6 +197,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     newSIUID = '1.3.12.2.1107.5.2.38.51014.' + str(newSIUID) + '11111.0.0.0' 
 
     ## UNKNOWN WHY THIS IS HERE - REMOVE?
+    SmallestImagePixelValue = minc.data.min()
     negative_handled = False
     if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
         if verbose:
@@ -227,6 +229,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
 
         # Insert pixel-data
         ds.PixelData = np_minc[i,:,:].tostring()
+        ds.LargestImagePixelValue = LargestImagePixelValue
 
         if modify:
             if verbose:
@@ -249,8 +252,6 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
             newSOP = newSOP.replace(".","")
             newSOP = '1.3.12.2.1107.5.2.38.51014.' + str(newSOP) + str(i+1)
             ds.SOPInstanceUID = newSOP
-
-            ds.LargestImagePixelValue = LargestImagePixelValue # Moved this line into modify - should it be outside?
 
             # Same for all files
             ds.SeriesInstanceUID = newSIUID
