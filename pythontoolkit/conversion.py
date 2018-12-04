@@ -122,7 +122,7 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
     os.system(cmd)
 
 
-def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None):  
+def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True):  
     """Convert a minc file to dicom
 
     Parameters
@@ -161,10 +161,13 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     if description or study_id:
         modify = True
     
-    dcmcontainer = look_for_dcm_files(dicomcontainer)
-    if dcmcontainer == -1:
-        print("Could not find dicom files in container..")
-        exit(-1)
+    if checkForFileEndings:
+        dcmcontainer = look_for_dcm_files(dicomcontainer)
+        if dcmcontainer == -1:
+            print("Could not find dicom files in container..")
+            exit(-1)
+    else:
+        dcmcontainer = dicomcontainer
 
     # Get information about the dataset from a single file
     firstfile = listdir_nohidden(dcmcontainer)[0]
