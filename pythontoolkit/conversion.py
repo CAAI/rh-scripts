@@ -311,7 +311,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol.writeFile() 
     out_vol.closeVolume() 
 
-def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False):
+def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,dry_run=False,roi_name=None):
     
     """Convert dcm file (RT struct) to minc file
 
@@ -324,9 +324,11 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
     mnc_output_file : string
         Path to the minc output file
     verbose : boolean, optional
-        Default = Flase (if true, print info)
+        Default = False (if true, print info)
     copy_name : boolean, optional
-        Default = Flase, If true the ROI name from Mirada is store in Minc header
+        Default = False, If true the ROI name from Mirada is store in Minc header
+    dry_run : boolean, optional
+        Default = False, If true, only the roi names will be printed, no files are saved
     Examples
     --------
     >>> from rhscripts.conversion import rtx_to_mnc
@@ -335,61 +337,71 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
     try:
         RTSS = dicom.read_file(dcmfile) 
-        print(RTSS.StructureSetROISequence[0].ROIName)
+            
         ROIs = RTSS.ROIContourSequence
 
-        if verbose:
+        if verbose or dry_run:
+            print(RTSS.StructureSetROISequence[0].ROIName)
             print("Found",len(ROIs),"ROIs")
 
-        volume = pyminc.volumeFromFile(mnc_container_file)
+        if not dry_run:
+            volume = pyminc.volumeFromFile(mnc_container_file)
 
 
         for ROI_id,ROI in enumerate(ROIs):
 
             # Create one MNC output file per ROI
             RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
-            RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+            if not dry_run:
+                RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
             contour_sequences = ROI.ContourSequence
 
-            if verbose:
+            if verbose or dry_run:
                 print(" --> Found",len(contour_sequences),"contour sequences for ROI:",RTSS.StructureSetROISequence[ROI_id].ROIName)
 
-            for contour in contour_sequences:
-                assert contour.ContourGeometricType == "CLOSED_PLANAR"
-
-                current_slice_i_print = 0
-                
+            # Only save for ROI with specific name
+            if not roi_name == None and not roi_name == RTSS.StructureSetROISequence[ROI_id].ROIName:
                 if verbose:
-                    print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
+                    print("Skipping ")
+                    continue
 
-                world_coordinate_points = np.array(contour.ContourData)
-                world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
-                current_slice = np.zeros((volume.getSizes()[1],volume.getSizes()[2]))
-                voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
-                current_slice_i = 0
-                for wi,world in enumerate(world_coordinate_points):
-                    voxel = volume.convertWorldToVoxel([-world[0],-world[1],world[2]])
-                    current_slice_i = voxel[0]
-                    voxel_coordinates_inplane[wi,:] = [voxel[2],voxel[1]]
-                current_slice_inner = np.zeros((volume.getSizes()[1],volume.getSizes()[2]),dtype=np.float)
-                converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
-                cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
+            if not dry_run:
+                for contour in contour_sequences:
+                    assert contour.ContourGeometricType == "CLOSED_PLANAR"
 
-                RTMINC.data[int(round(current_slice_i))] += current_slice_inner
-                
+                    current_slice_i_print = 0
+                    
+                    if verbose:
+                        print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
 
+                    
+                    world_coordinate_points = np.array(contour.ContourData)
+                    world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
+                    current_slice = np.zeros((volume.getSizes()[1],volume.getSizes()[2]))
+                    voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
+                    current_slice_i = 0
+                    for wi,world in enumerate(world_coordinate_points):
+                        voxel = volume.convertWorldToVoxel([-world[0],-world[1],world[2]])
+                        current_slice_i = voxel[0]
+                        voxel_coordinates_inplane[wi,:] = [voxel[2],voxel[1]]
+                    current_slice_inner = np.zeros((volume.getSizes()[1],volume.getSizes()[2]),dtype=np.float)
+                    converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
+                    cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
 
-            # Remove even areas - implies a hole.
-            RTMINC.data[RTMINC.data % 2 == 0] = 0
+                    RTMINC.data[int(round(current_slice_i))] += current_slice_inner                    
 
-            RTMINC.writeFile()
-            RTMINC.closeVolume()
+            if not dry_run:
+                # Remove even areas - implies a hole.
+                RTMINC.data[RTMINC.data % 2 == 0] = 0
 
-            if copy_name:
-                print('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
-                os.system('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
+                RTMINC.writeFile()
+                RTMINC.closeVolume()
 
-        volume.closeVolume()
+                if copy_name:
+                    print('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
+                    os.system('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)
+        if not dry_run:
+            volume.closeVolume()
 
     except InvalidDicomError:
         print("Could not read DICOM RTX file",args.RTX)

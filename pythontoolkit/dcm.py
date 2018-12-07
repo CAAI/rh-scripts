@@ -5,6 +5,9 @@ try:
 except ImportError:
     import dicom
 import configparser
+import glob
+from shutil import copyfile
+
 from rhscripts.conversion import findExtension
 
 def get_description(file):
@@ -56,6 +59,60 @@ def get_studydate(file):
         Path to the dicom file
     """
     return dicom.read_file(file).StudyDate
+
+def get_time_slices(file):
+    """ Get the NumberOfTimeSlices of a dicom file
+
+    Parameters
+    ----------
+    file : string
+        Path to the dicom file
+    """
+    return int(dicom.read_file(file).NumberOfTimeSlices)
+
+def get_tag(file,tag):
+    """ Get a tag from a dicom file
+
+    Parameters
+    ----------
+    file : string
+        Path to the dicom file
+    tag : string
+        Tag name
+    """
+    return dicom.read_file(file, force=True).data_element(tag).value
+
+def sort_files(path):
+    """ Sort a folder of DICOM files
+    It will rename the files based on InstanceNumber
+    It will create subfolders if multiple time-points exists
+
+    Parameters
+    ----------
+    path : string
+        Path to the dicom files
+    """
+    folder = '%s_sorted' % path
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+
+    last_file = glob.glob(path+'/*')[-1]
+
+    do_split = False if get_time_slices(last_file) == 1 else True
+
+    for dcmfile in os.listdir(path):
+
+        if do_split:
+            frame_name = 'frame_%010d' % int(get_tag(os.path.join(path,dcmfile),'FrameReferenceTime'))
+            if not os.path.exists(os.path.join(folder,frame_name)):
+                os.mkdir(os.path.join(folder,frame_name))
+
+            fname = '%s/%s/dicom_%04d.dcm' % (folder, frame_name, get_tag(os.path.join(path,dcmfile),'InstanceNumber'))
+        else:
+            fname = '%s/dicom_%04d.dcm' % (folder, get_tag(os.path.join(path,dcmfile),'InstanceNumber'))
+
+        copyfile(os.path.join(path,dcmfile), fname)
+
 
 def send_data(folder, server=None, checkForEndings=True):
     """Send a dicom dataset to a dicom node
