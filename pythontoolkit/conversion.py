@@ -11,9 +11,7 @@ import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
 import cv2
-
-
-from rhscripts.utils import listdir_nohidden
+from rhscripts.utils import listdir_nohidden, bbox_ND
 
 def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
     """Return the number of files with one of the extensions, 
@@ -311,7 +309,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol.writeFile() 
     out_vol.closeVolume() 
 
-def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,dry_run=False,roi_name=None):
+def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,dry_run=False,roi_name=None,crop_area=False):
     
     """Convert dcm file (RT struct) to minc file
 
@@ -329,6 +327,10 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
         Default = False, If true the ROI name from Mirada is store in Minc header
     dry_run : boolean, optional
         Default = False, If true, only the roi names will be printed, no files are saved
+    roi_name : string, optional
+        Specify a name, only ROIs matching this description will be created
+    crop_area : boolean, optional
+        Instead of the full area matching the mnc_container, crop the area to match values > 0
     Examples
     --------
     >>> from rhscripts.conversion import rtx_to_mnc
@@ -363,7 +365,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
             if not roi_name == None and not roi_name == RTSS.StructureSetROISequence[ROI_id].ROIName:
                 if verbose:
                     print("Skipping ")
-                    continue
+                continue
 
             if not dry_run:
                 for contour in contour_sequences:
@@ -373,7 +375,6 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
                     
                     if verbose:
                         print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
-
                     
                     world_coordinate_points = np.array(contour.ContourData)
                     world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
@@ -394,8 +395,14 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
                 # Remove even areas - implies a hole.
                 RTMINC.data[RTMINC.data % 2 == 0] = 0
 
-                RTMINC.writeFile()
-                RTMINC.closeVolume()
+                # Save cropped area of label, or full volume
+                if crop_area:
+                    # TODO
+                    print("Functionality not implemented yet")
+                    exit(-1)
+                else
+                    RTMINC.writeFile()
+                    RTMINC.closeVolume()
 
                 if copy_name:
                     print('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+RTSS.StructureSetROISequence[ROI_id].ROIName+'" '+RTMINC_outname)

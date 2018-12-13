@@ -13,7 +13,7 @@ VERSIONING
   0.0.7 # Added rtdose_to_mnc and rtx_to_mnc
   0.0.8 # Fixed bug with dicom toolkit conflicting with pydicom when installed with version < 1.0
   0.0.9 # Restructured mnc2dcm and moved LargestPixelValue into modify part of script
-  0.0.10 # Added dry_run and roi_name functionality to conversion.rtx2mnc
+  0.0.10 # Added dry_run, roi_name, and crop_area functionality to conversion.rtx2mnc
 
 """
 
