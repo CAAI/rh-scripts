@@ -396,7 +396,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
         exit(-1)
 
 
-def hu2lac(infile,outfile,kvp=120,mrac=False,verbose=False):
+def hu2lac(infile,outfile,kvp,mrac=False,verbose=False):
 
     """Convert CT-HU to LAC @ 511 keV
 
@@ -406,8 +406,8 @@ def hu2lac(infile,outfile,kvp=120,mrac=False,verbose=False):
         Path to the input mnc file   
     outfile : string
         ath to the outputmnc file 
-    kvp : int, optinal
-        Integer that specify the kVp on CT scan (default =120)
+    kvp : int
+        Integer that specify the kVp on CT scan
     mrac: boolean, optional
         if set, scales the LAC [cm^-1] by 10000
     verbose : boolean, optional
@@ -433,7 +433,7 @@ def hu2lac(infile,outfile,kvp=120,mrac=False,verbose=False):
     os.system(cmd)
 
 
-def lac2hu(infile,outfile,kvp=120,mrac=False,verbose=False):
+def lac2hu(infile,outfile,kvp,mrac=False,verbose=False):
 
     """Convert LAC @ 511 keV to  CT-HU
 
@@ -443,8 +443,8 @@ def lac2hu(infile,outfile,kvp=120,mrac=False,verbose=False):
         Path to the input mnc file   
     outfile : string
         ath to the outputmnc file 
-    kvp : int, optinal
-        Integer that specify the kVp on CT scan (default =120)
+    kvp : int
+        Integer that specify the kVp on CT scan
     mrac: boolean, optional
         if set, accounts for the fact that LAC [cm^-1] is multiplyed by 10000
     verbose : boolean, optional
