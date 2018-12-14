@@ -14,6 +14,8 @@ INSTALL(PROGRAMS conversion/dicom_to_minc.py
 	conversion/rtx2mnc.py
 	conversion/mnc2dcm.py
 	conversion/rtdose2mnc.py
+	conversion/hu2lac.py
+	conversion/lac2hu.py
   PERMISSIONS
     OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ
   DESTINATION
