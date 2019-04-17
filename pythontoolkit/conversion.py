@@ -229,7 +229,7 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
 
         # Insert pixel-data
         ds.PixelData = np_minc[i,:,:].tostring()
-        ds.LargestImagePixelValue = LargestImagePixelValue
+        # ds.LargestImagePixelValue = LargestImagePixelValue
 
         if modify:
             if verbose:
@@ -335,7 +335,6 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
     try:
         RTSS = dicom.read_file(dcmfile) 
-        print(RTSS.StructureSetROISequence[0].ROIName)
         ROIs = RTSS.ROIContourSequence
 
         if verbose:
@@ -346,9 +345,17 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
         for ROI_id,ROI in enumerate(ROIs):
 
+            print(RTSS.StructureSetROISequence[ROI_id].ROIName)
+
             # Create one MNC output file per ROI
-            RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
-            RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+            if copy_name:
+                outpath, outname = os.path.split(mnc_output_file)
+                RTMINC_outname = os.path.join(outpath,RTSS.StructureSetROISequence[ROI_id].ROIName+".mnc")
+                RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+            else:
+                RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
+                RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+
             contour_sequences = ROI.ContourSequence
 
             if verbose:
