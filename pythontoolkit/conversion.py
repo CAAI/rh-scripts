@@ -311,7 +311,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol.writeFile() 
     out_vol.closeVolume() 
 
-def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False):
+def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,roi_name=None):
     
     """Convert dcm file (RT struct) to minc file
 
@@ -327,6 +327,8 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
         Default = Flase (if true, print info)
     copy_name : boolean, optional
         Default = Flase, If true the ROI name from Mirada is store in Minc header
+    roi_name : string, optional
+        Specify a name, only ROIs matching this description will be created
     Examples
     --------
     >>> from rhscripts.conversion import rtx_to_mnc
@@ -347,6 +349,12 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
             print(RTSS.StructureSetROISequence[ROI_id].ROIName)
 
+            # Only save for ROI with specific name
+            if not roi_name == None and not roi_name == RTSS.StructureSetROISequence[ROI_id].ROIName:
+                if verbose:
+                    print("Skipping ")
+                continue
+
             # Create one MNC output file per ROI
             if copy_name:
                 outpath, outname = os.path.split(mnc_output_file)
@@ -360,6 +368,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
             if verbose:
                 print(" --> Found",len(contour_sequences),"contour sequences for ROI:",RTSS.StructureSetROISequence[ROI_id].ROIName)
+
 
             for contour in contour_sequences:
                 assert contour.ContourGeometricType == "CLOSED_PLANAR"
@@ -442,17 +451,18 @@ def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
         cmd = 'minccalc -expression \"if(A[0]<52){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000443+0.0544)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
     elif kvp == 120:
         cmd = 'minccalc -expression \"if(A[0]<47){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000510+0.0471)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
+    elif kvp == 140:
+        cmd = 'minccalc -expression \"if(A[0]<30){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000564+0.0408)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'        
     else:
         print('No conversion for this KVP!')
-        return        
+        return     
 
     if verbose:
         print(cmd)
-
     os.system(cmd)
 
 
-def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
+def lac2hu(infile,outfile,reffile=None,kvp=None,mrac=False,verbose=False):
 
     """Convert LAC @ 511 keV to  CT-HU
 
@@ -473,8 +483,11 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
     >>> from rhscripts.conversion import lac2hu
     >>> lac2hu('CT_lac.mnc',CT_hu.mnc',kvp = 120)
     """
+    if reffile is None:
+        reffile = infile
+
     if not kvp:
-        kvp = os.popen('mincinfo -attvalue dicom_0x0018:el_0x0060 ' + infile + ' -error_string noKVP').read().rstrip()
+        kvp = os.popen('mincinfo -attvalue dicom_0x0018:el_0x0060 ' + reffile + ' -error_string noKVP').read().rstrip()
         if kvp == 'noKVP':
             print('Cant find KVP in header. Are you sure this a CT image?')
             return
@@ -493,6 +506,9 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
     elif kvp == 120:
         breakpoint = ((47+1000)*0.000096)*fscalefactor        
         cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0471)/0.0000510 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
+    elif kvp == 140:
+        breakpoint = ((30+1000)*0.000096)*fscalefactor        
+        cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0408)/0.0000564 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
     else:
         print('No conversion for this KVP!')
         return
@@ -500,4 +516,4 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
     if verbose:
         print(cmd)
     
-    os.system(cmd)                 
+    os.system(cmd)                

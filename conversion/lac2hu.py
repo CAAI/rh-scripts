@@ -10,6 +10,7 @@ __version__ = '0.0.1'
 parser = argparse.ArgumentParser(description='Convert LAC to CT-HU')
 parser.add_argument('infile', help='Path to the minc input file', nargs='?')
 parser.add_argument('outfile', help='Path to the minc output file', nargs='?')
+parser.add_argument("--reffile", help="Path to a minc CT scan with the correct kVp", nargs='?')
 parser.add_argument("--kvp", help="Integer that specify the kVp on CT scan",type =int, nargs='?',default=None)
 parser.add_argument("--mrac", help="if set, accounts for the fact that LAC [cm^-1] is multiplyed by 10000", action="store_true")
 parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
@@ -27,4 +28,5 @@ if not args.infile or not args.outfile:
 	print('Too few arguments')
 	exit(-1)
 
-lac2hu(args.infile, args.outfile,kvp=args.kvp,mrac=args.mrac,verbose=args.verbose)
+
+lac2hu(args.infile, args.outfile, reffile=args.reffile, kvp=args.kvp,mrac=args.mrac,verbose=args.verbose)
