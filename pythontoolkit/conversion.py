@@ -175,7 +175,6 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
     # Load the minc file
     minc = pyminc.volumeFromFile(mncfile)
-    LargestImagePixelValue = int(minc.data.max())
     np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
     minc.closeVolume()
     # Check that the correct number of files exists
@@ -195,24 +194,29 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     newSIUID = '1.3.12.2.1107.5.2.38.51014.' + str(newSIUID) + '11111.0.0.0' 
 
     ## UNKNOWN WHY THIS IS HERE - REMOVE?
-    SmallestImagePixelValue = minc.data.min()
-    negative_handled = False
-    if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
-        if verbose:
-            print("Ran into negative values in uint16 dtype, clamping to 0")
-        np_minc = np.maximum( np_minc, 0 )
-        negative_handled = True
-    if verbose and SmallestImagePixelValue < 0 and not negative_handled:
-        print("Unhandled dtype for negative values: %s" % ds.pixel_array.dtype)
-    if np.max(np_minc) > LargestImagePixelValue:
-        if verbose:
-            print("Maximum value exceeds LargestImagePixelValue - setting to zero")
-        np_minc[ np.where( np_minc > LargestImagePixelValue ) ] = 0
+    #SmallestImagePixelValue = minc.data.min()
+    #negative_handled = False
+    #if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
+    #    if verbose:
+    #        print("Ran into negative values in uint16 dtype, clamping to 0")
+    #    np_minc = np.maximum( np_minc, 0 )
+    #    negative_handled = True
+    #if verbose and SmallestImagePixelValue < 0 and not negative_handled:
+    #    print("Unhandled dtype for negative values: %s" % ds.pixel_array.dtype)
+    #if np.max(np_minc) > LargestImagePixelValue:
+    #    if verbose:
+    #        print("Maximum value exceeds LargestImagePixelValue - setting to zero")
+    #    np_minc[ np.where( np_minc > LargestImagePixelValue ) ] = 0
+
+    np_minc = np.maximum( np_minc, 0 )
+
     ## END OF UKNOWN
 
     # Create output folder
     if not os.path.exists(dicomfolder):
         os.mkdir(dicomfolder)
+
+
 
     # List files, do not need to be ordered
     for f in listdir_nohidden(dcmcontainer):
@@ -225,9 +229,28 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         # Check inplane-dimension is the same
         assert ds.pixel_array.shape == (np_minc.shape[1],np_minc.shape[2])
 
+        # Scale pixel-data by intercept and rescale-slope
+        #print(f,float(ds.RescaleSlope))
+        #data_slice = np.divide(np_minc[i,:,:] - float(ds.RescaleIntercept), ds.RescaleSlope)
+        #ds.RescaleSlope = ds.RescaleSlope / 10.0
+        data_slice = np_minc[i,:,:].astype('double')
+        data_slice /= float(ds.RescaleSlope)
+        data_slice = data_slice.astype('int16')
+        #print(data_slice.min(), data_slice.max())
+        #print(np.mean(np_minc[i,:,:]), float(ds.RescaleSlope), np.mean(data_slice), ds.LargestImagePixelValue)
+        #data_slice = np_minc[i,:,:] / float(ds.RescaleSlope)
+        #ds.RescaleSlope = ds.RescaleSlope / 10
+        #ds.RescaleIntercept = 0
+        #LargestImagePixelValue = int(data_slice.max()) # Should be before or after slope and intercept?
+        #print(data_slice.min(), LargestImagePixelValue)
+        #if LargestImagePixelValue > ds.LargestImagePixelValue:
+        #    print(LargestImagePixelValue)
+        if np.max(data_slice) > ds.LargestImagePixelValue:
+            print(np.max(data_slice))
+
         # Insert pixel-data
-        ds.PixelData = np_minc[i,:,:].tostring()
-        ds.LargestImagePixelValue = LargestImagePixelValue
+        ds.PixelData = data_slice.tostring()
+        #ds.LargestImagePixelValue = LargestImagePixelValue
 
         if modify:
             if verbose:
@@ -251,6 +274,19 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
             newSOP = '1.3.12.2.1107.5.2.38.51014.' + str(newSOP) + str(i+1)
             ds.SOPInstanceUID = newSOP
 
+            # Update MediaStorageSOPInstanceUID - unique per file
+            try:
+                newMSOP = unicode(datetime.datetime.now())  # Python2
+            except:
+                newMSOP = str(datetime.datetime.now())  # Python3
+            newMSOP = newMSOP.replace("-","")
+            newMSOP = newMSOP.replace(" ","")
+            newMSOP = newMSOP.replace(":","")
+            newMSOP = newMSOP.replace(".","")
+            newMSOP = newMSOP[-10:]
+            newMSOP = '1.3.12.2.1107.5.1.4.99999.15359' + str(newMSOP) + str(i+1)
+            ds.file_meta.MediaStorageSOPInstanceUID = newMSOP
+
             # Same for all files
             ds.SeriesInstanceUID = newSIUID
 
@@ -260,6 +296,181 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     if verbose:
         print("Output written to %s" % dicomfolder)
 
+def mnc_to_dcm_4D(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True):  
+    """Convert a minc file to dicom
+
+    Parameters
+    ----------
+    mncfile : string
+        Path to the minc file
+    dicomcontainer : string
+        Path to the directory containing the dicom container
+    dicomfolder : string
+        Path to the output dicom folder
+    verbose : boolean, optional
+        Set the verbosity
+    modify : boolean, optional
+        Create new SeriesInstanceUID and SOPInstanceUID
+        Default on if description or id is set
+    description : string, optional
+        Sets the SeriesDescription tag in the dicom files
+    id : int, optional
+        Sets the SeriesNumber tag in the dicom files
+
+    Examples
+    --------
+    >>> from rhscripts.conversion import mnc_to_dcm
+    >>> mnc_to_dcm_4D('PETCT_new.mnc','PETCT','PETCT_new',description="PETCT_new",id="600")
+    """
+
+    ## TODO
+    # Add slope and intercept (e.g. for PET)
+    # Fix max in numpy conversion
+    # 4D MRI
+    # time series data
+    
+    if verbose:
+        print("Converting to DICOM")
+
+    if description or study_id:
+        modify = True
+    
+    if checkForFileEndings:
+        dcmcontainer = look_for_dcm_files(dicomcontainer)
+        if dcmcontainer == -1:
+            print("Could not find dicom files in container..")
+            exit(-1)
+    else:
+        dcmcontainer = dicomcontainer
+
+    # Get information about the dataset from a single file
+    firstfile = listdir_nohidden(dcmcontainer)[0]
+    try:
+        ds=dicom.read_file(os.path.join(dcmcontainer,firstfile).decode('utf8'))
+    except AttributeError:
+        ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
+    # Load the minc file
+    minc = pyminc.volumeFromFile(mncfile)
+    timeslots = ds.NumberOfTimeSlots
+    numberofslices = ds.NumberOfSlices
+    #print(timeslots,numberofslices,timeslots*numberofslices)
+    np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
+    minc.closeVolume()
+    #print(np_minc.shape)
+    # Check that the correct number of files exists
+    if verbose:
+        print("Checking files ( %d ) equals number of slices ( %d )" % (len(listdir_nohidden(dcmcontainer)), np_minc.shape[0]))
+    assert len(listdir_nohidden(dcmcontainer)) == np_minc.shape[0]*np_minc.shape[1]
+
+    ## Prepare for MODIFY HEADER
+    try:
+        newSIUID = unicode(datetime.datetime.now()) # Python2
+    except:
+        newSIUID = str(datetime.datetime.now()) #Python3
+    newSIUID = newSIUID.replace("-","")
+    newSIUID = newSIUID.replace(" ","")
+    newSIUID = newSIUID.replace(":","")
+    newSIUID = newSIUID.replace(".","")
+    newSIUID = '1.3.12.2.1107.5.2.38.51014.' + str(newSIUID) + '11111.0.0.0' 
+
+    ## UNKNOWN WHY THIS IS HERE - REMOVE?
+    #SmallestImagePixelValue = minc.data.min()
+    #negative_handled = False
+    #if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
+    #    if verbose:
+    #        print("Ran into negative values in uint16 dtype, clamping to 0")
+    #    np_minc = np.maximum( np_minc, 0 )
+    #    negative_handled = True
+    #if verbose and SmallestImagePixelValue < 0 and not negative_handled:
+    #    print("Unhandled dtype for negative values: %s" % ds.pixel_array.dtype)
+    #if np.max(np_minc) > LargestImagePixelValue:
+    #    if verbose:
+    #        print("Maximum value exceeds LargestImagePixelValue - setting to zero")
+    #    np_minc[ np.where( np_minc > LargestImagePixelValue ) ] = 0
+    np_minc = np.maximum( np_minc, 0 )
+    ## END OF UKNOWN
+
+    # Create output folder
+    if not os.path.exists(dicomfolder):
+        os.mkdir(dicomfolder)
+
+    # List files, do not need to be ordered
+    for f in listdir_nohidden(dcmcontainer):
+        try:
+            ds=dicom.read_file(os.path.join(dcmcontainer,f).decode('utf8'))
+        except AttributeError:
+            ds=dicom.read_file(os.path.join(dcmcontainer,f))
+        i = int(ds.InstanceNumber)-1
+
+        # Check inplane-dimension is the same
+        assert ds.pixel_array.shape == (np_minc.shape[2],np_minc.shape[3])
+
+        # Scale pixel-data by intercept and rescale-slope
+        #print(f,float(ds.RescaleSlope))
+        #data_slice = np.divide(np_minc[i,:,:] - float(ds.RescaleIntercept), ds.RescaleSlope)
+        
+        slice_time = i // numberofslices
+        slice_number = i % numberofslices
+        #print(f,i,slice_time,slice_number)
+
+        data_slice = np_minc[slice_time,slice_number,:,:]
+        #ds.RescaleSlope = 1.0
+        #ds.RescaleIntercept = 0
+        #LargestImagePixelValue = int(data_slice.max()) # Should be before or after slope and intercept?
+
+        data_slice = data_slice.astype('double')
+        data_slice /= float(ds.RescaleSlope)
+        data_slice = data_slice.astype('int16')
+        if np.max(data_slice) > ds.LargestImagePixelValue:
+            print(np.max(data_slice))
+
+        # Insert pixel-data
+        ds.PixelData = data_slice.tostring()
+        #ds.LargestImagePixelValue = LargestImagePixelValue
+
+        if modify:
+            if verbose:
+                print("Modifying DICOM headers")
+
+            # Set information if given
+            if not description == None:
+                ds.SeriesDescription = description
+            if not study_id == None:
+                ds.SeriesNumber = study_id
+
+            # Update SOP - unique per file
+            try:
+                newSOP = unicode(datetime.datetime.now())  # Python2
+            except:
+                newSOP = str(datetime.datetime.now())  # Python3
+            newSOP = newSOP.replace("-","")
+            newSOP = newSOP.replace(" ","")
+            newSOP = newSOP.replace(":","")
+            newSOP = newSOP.replace(".","")
+            newSOP = '1.3.12.2.1107.5.2.38.51014.' + str(newSOP) + str(i+1)
+            ds.SOPInstanceUID = newSOP
+
+            # Update MediaStorageSOPInstanceUID - unique per file
+            try:
+                newMSOP = unicode(datetime.datetime.now())  # Python2
+            except:
+                newMSOP = str(datetime.datetime.now())  # Python3
+            newMSOP = newMSOP.replace("-","")
+            newMSOP = newMSOP.replace(" ","")
+            newMSOP = newMSOP.replace(":","")
+            newMSOP = newMSOP.replace(".","")
+            newMSOP = newMSOP[-10:]
+            newMSOP = '1.3.12.2.1107.5.1.4.99999.15359' + str(newMSOP) + str(i+1)
+            ds.file_meta.MediaStorageSOPInstanceUID = newMSOP
+
+            # Same for all files
+            ds.SeriesInstanceUID = newSIUID
+
+        fname = "dicom_%04d.dcm" % int(ds.InstanceNumber)
+        ds.save_as(os.path.join(dicomfolder,fname))
+
+    if verbose:
+        print("Output written to %s" % dicomfolder)
 
 def rtdose_to_mnc(dcmfile,mncfile):
     
@@ -400,7 +611,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
                     # TODO
                     print("Functionality not implemented yet")
                     exit(-1)
-                else
+                else:
                     RTMINC.writeFile()
                     RTMINC.closeVolume()
 

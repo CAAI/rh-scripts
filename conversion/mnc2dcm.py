@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import argparse
-from rhscripts.conversion import mnc_to_dcm
+from rhscripts.conversion import mnc_to_dcm, mnc_to_dcm_4D
 from rhscripts.version import __show_version__
+import pyminc.volumes.factory as pyminc
 
 __scriptname__ = 'mnc2dcm'
 __version__ = '0.0.2'
@@ -64,7 +65,21 @@ if not args.minc_file or not args.dicom_container or not args.dicom_output:
     exit(-1)
 
 
-mnc_to_dcm( args.minc_file, 
+minc = pyminc.volumeFromFile(args.minc_file)
+dinames = minc.dimnames
+minc.closeVolume()
+
+if 'time' in minc.dimnames:
+	mnc_to_dcm_4D( args.minc_file, 
+            args.dicom_container, 
+            args.dicom_output, 
+            verbose=args.verbose, 
+            modify=args.modify, 
+            description=args.description, 
+            study_id=args.id, 
+            checkForFileEndings=args.ignore_check)
+else:
+	mnc_to_dcm( args.minc_file, 
             args.dicom_container, 
             args.dicom_output, 
             verbose=args.verbose, 
