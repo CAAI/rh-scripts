@@ -193,30 +193,26 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     newSIUID = newSIUID.replace(".","")
     newSIUID = '1.3.12.2.1107.5.2.38.51014.' + str(newSIUID) + '11111.0.0.0' 
 
-    ## UNKNOWN WHY THIS IS HERE - REMOVE?
-    #SmallestImagePixelValue = minc.data.min()
-    #negative_handled = False
-    #if( np.issubdtype(np.uint16, ds.pixel_array.dtype) and SmallestImagePixelValue < 0):
-    #    if verbose:
-    #        print("Ran into negative values in uint16 dtype, clamping to 0")
-    #    np_minc = np.maximum( np_minc, 0 )
-    #    negative_handled = True
-    #if verbose and SmallestImagePixelValue < 0 and not negative_handled:
-    #    print("Unhandled dtype for negative values: %s" % ds.pixel_array.dtype)
-    #if np.max(np_minc) > LargestImagePixelValue:
-    #    if verbose:
-    #        print("Maximum value exceeds LargestImagePixelValue - setting to zero")
-    #    np_minc[ np.where( np_minc > LargestImagePixelValue ) ] = 0
-
     np_minc = np.maximum( np_minc, 0 )
-
-    ## END OF UKNOWN
 
     # Create output folder
     if not os.path.exists(dicomfolder):
         os.mkdir(dicomfolder)
 
-
+    # Calculate new rescale slope if not 1
+    RescaleSlope = 1.0
+    doUpdateRescaleSlope = False
+    if not ds.RescaleSlope == RescaleSlope:
+        if np.max(np_minc)/ds.RescaleSlope+ds.RescaleIntercept > 32767:
+            old_RescaleSlope = ds.RescaleSlope
+            vol_max = np.max(np_minc)
+            RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
+            doUpdateRescaleSlope = True
+            if verbose:
+                print("MAX EXCEEDED - RECALCULATING RESCALE SLOPE")
+                print("WAS: %f\nIS: %f" % (old_RescaleSlope,RescaleSlope))
+        else:
+            RescaleSlope = ds.RescaleSlope
 
     # List files, do not need to be ordered
     for f in listdir_nohidden(dcmcontainer):
@@ -229,28 +225,19 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         # Check inplane-dimension is the same
         assert ds.pixel_array.shape == (np_minc.shape[1],np_minc.shape[2])
 
-        # Scale pixel-data by intercept and rescale-slope
-        #print(f,float(ds.RescaleSlope))
-        #data_slice = np.divide(np_minc[i,:,:] - float(ds.RescaleIntercept), ds.RescaleSlope)
-        #ds.RescaleSlope = ds.RescaleSlope / 10.0
+        # UPDATE CHANGE RESCALESLOPE
+        if doUpdateRescaleSlope:
+            ds.RescaleSlope = RescaleSlope
+
         data_slice = np_minc[i,:,:].astype('double')
-        data_slice /= float(ds.RescaleSlope)
-        data_slice = data_slice.astype('int16')
-        #print(data_slice.min(), data_slice.max())
-        #print(np.mean(np_minc[i,:,:]), float(ds.RescaleSlope), np.mean(data_slice), ds.LargestImagePixelValue)
-        #data_slice = np_minc[i,:,:] / float(ds.RescaleSlope)
-        #ds.RescaleSlope = ds.RescaleSlope / 10
-        #ds.RescaleIntercept = 0
-        #LargestImagePixelValue = int(data_slice.max()) # Should be before or after slope and intercept?
-        #print(data_slice.min(), LargestImagePixelValue)
-        #if LargestImagePixelValue > ds.LargestImagePixelValue:
-        #    print(LargestImagePixelValue)
-        if np.max(data_slice) > ds.LargestImagePixelValue:
-            print(np.max(data_slice))
+        data_slice /= float(RescaleSlope)
+        if np.max(data_slice) > 32767:
+            print("OOOOPS - NEGATIVE VALUES OCCURED!!!")
+            print(np.max(data_slice),ds.RescaleSlope,RescaleSlope)
+        data_slice = data_slice.astype('int16') # To signed short
 
         # Insert pixel-data
         ds.PixelData = data_slice.tostring()
-        #ds.LargestImagePixelValue = LargestImagePixelValue
 
         if modify:
             if verbose:
