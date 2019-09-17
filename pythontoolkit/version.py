@@ -15,6 +15,7 @@ VERSIONING
   0.0.9 # Restructured mnc2dcm and moved LargestPixelValue into modify part of script
   0.0.10 # Added dry_run, roi_name, and crop_area functionality to conversion.rtx2mnc
   0.0.11 # mnc2dcm fixed with PET values above LargestPixelValue 32767
+  0.0.12 # mnc2dcm4D fixed with PET values above LargestPixelValue 32767
 
 """
 
