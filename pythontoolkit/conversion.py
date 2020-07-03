@@ -281,8 +281,11 @@ def rtdose_to_mnc(dcmfile,mncfile):
     """
 
     # Load the dicom
-    ds = dicom.dcmread(dcmfile)
+    ds = dicom.dcmread(dcmfile,force=True)
     
+    if 'TransferSyntaxUID' not in ds.file_meta:
+        ds.fix_meta_info()
+
     # Extract the starts and steps of the x,y,z space
     starts = ds.ImagePositionPatient
     steps = [float(i) for i in ds.PixelSpacing];
@@ -336,7 +339,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
     """
 
     try:
-        RTSS = dicom.read_file(dcmfile) 
+        RTSS = dicom.read_file(dcmfile,force=True) 
         ROIs = RTSS.ROIContourSequence
 
         if verbose:
