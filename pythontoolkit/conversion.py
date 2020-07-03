@@ -2,11 +2,11 @@
 
 import os, glob
 try:
-    import pydicom as dicom
-    from pydicom.filereader import InvalidDicomError #For rtx2mnc
+   import pydicom as dicom
+   from pydicom.filereader import InvalidDicomError #For rtx2mnc
 except ImportError:
-    import dicom
-    from dicom.filereader import InvalidDicomError #For rtx2mnc
+   import dicom
+   from dicom.filereader import InvalidDicomError #For rtx2mnc
 import pyminc.volumes.factory as pyminc
 import numpy as np
 import datetime
@@ -307,6 +307,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     steps = [a*b for a,b in zip([1,-1,-1],steps)]
     
     #Get the pixel data and scale it correctly
+    #print('Scaling = '+str(float(ds.DoseGridScaling)))
     dose_array = ds.pixel_array*float(ds.DoseGridScaling)
     
     # Write the output minc file
@@ -361,7 +362,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
             # Create one MNC output file per ROI
             if copy_name:
                 outpath, outname = os.path.split(mnc_output_file)
-                RTMINC_outname = os.path.join(outpath,RTSS.StructureSetROISequence[ROI_id].ROIName+".mnc")
+                RTMINC_outname = os.path.join(outpath,outname[:-4]+'_'+RTSS.StructureSetROISequence[ROI_id].ROIName.replace(" ", "_")+".mnc")
                 RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
             else:
                 RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
