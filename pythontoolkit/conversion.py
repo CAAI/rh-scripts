@@ -355,8 +355,10 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
 
             # Only save for ROI with specific name
             if not roi_name == None and not roi_name == RTSS.StructureSetROISequence[ROI_id].ROIName:
-                if verbose:
-                    print("Skipping ")
+                print("Skipping...")
+                continue
+            if not hasattr(ROI, 'ContourSequence'):
+                print("Skipping...")
                 continue
 
             # Create one MNC output file per ROI
@@ -367,6 +369,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
             else:
                 RTMINC_outname = mnc_output_file if len(ROIs) == 1 else mnc_output_file[:-4] + "_" + str(ROI_id) + ".mnc"
                 RTMINC = pyminc.volumeLikeFile(mnc_container_file,RTMINC_outname)
+
 
             contour_sequences = ROI.ContourSequence
 
