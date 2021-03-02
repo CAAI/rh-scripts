@@ -175,7 +175,8 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         ds=dicom.read_file(os.path.join(dcmcontainer,firstfile))
     # Load the minc file
     minc = pyminc.volumeFromFile(mncfile)
-    np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
+    np_minc = np.array(minc.data)
+    #np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
     minc.closeVolume()
     # Check that the correct number of files exists
     if verbose:
@@ -202,17 +203,18 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     # Calculate new rescale slope if not 1
     RescaleSlope = 1.0
     doUpdateRescaleSlope = False
-    if not ds.RescaleSlope == RescaleSlope:
-        if np.max(np_minc)/ds.RescaleSlope+ds.RescaleIntercept > 32767:
-            old_RescaleSlope = ds.RescaleSlope
-            vol_max = np.max(np_minc)
-            RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
-            doUpdateRescaleSlope = True
-            if verbose:
-                print("MAX EXCEEDED - RECALCULATING RESCALE SLOPE")
-                print("WAS: %f\nIS: %f" % (old_RescaleSlope,RescaleSlope))
-        else:
-            RescaleSlope = ds.RescaleSlope
+    if hasattr(ds, 'RescaleSlope'):
+        if not ds.RescaleSlope == RescaleSlope:
+            if np.max(np_minc)/ds.RescaleSlope+ds.RescaleIntercept > 32767:
+                old_RescaleSlope = ds.RescaleSlope
+                vol_max = np.max(np_minc)
+                RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
+                doUpdateRescaleSlope = True
+                if verbose:
+                    print("MAX EXCEEDED - RECALCULATING RESCALE SLOPE")
+                    print("WAS: %f\nIS: %f" % (old_RescaleSlope,RescaleSlope))
+            else:
+                RescaleSlope = ds.RescaleSlope
 
     # List files, do not need to be ordered
     for f in listdir_nohidden(dcmcontainer):
@@ -340,7 +342,7 @@ def mnc_to_dcm_4D(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,
     minc = pyminc.volumeFromFile(mncfile)
     timeslots = ds.NumberOfTimeSlots
     numberofslices = ds.NumberOfSlices
-    np_minc = np.array(minc.data,dtype=ds.pixel_array.dtype)
+    np_minc = np.array(minc.data)#,dtype=ds.pixel_array.dtype) # dtype is redefined later..
     minc.closeVolume()
 
     # Check that the correct number of files exists
