@@ -34,6 +34,8 @@ VERSIONING
         Sets the SeriesNumber tag in the dicom files
     ignore_check : boolean, optional
         Sets the check for dicom files in container to false
+    forceRescaleSlope : boolean, optional
+        Forces recalculation of RescaleSlope
     verbose : boolean, optional
         Set the verbosity
     version : boolean, optional
@@ -49,6 +51,7 @@ parser.add_argument("-m","--modify", help="Modify DICOM headers to match contain
 parser.add_argument('--description', help="New name of the DICOM file", nargs=1, type=str)
 parser.add_argument('--id', help="New ID of the DICOM file", nargs=1, type=int)
 parser.add_argument("--ignore_check", help="Ignore the check for dicom files in container", action="store_false")
+parser.add_argument("--forceRescaleSlope", help="Force the script to recalculate rescale slope", action="store_true")
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -77,7 +80,8 @@ if 'time' in minc.dimnames:
             modify=args.modify, 
             description=args.description, 
             study_id=args.id, 
-            checkForFileEndings=args.ignore_check)
+            checkForFileEndings=args.ignore_check,
+            forceRescaleSlope=args.forceRescaleSlope)
 else:
 	mnc_to_dcm( args.minc_file, 
             args.dicom_container, 
@@ -86,4 +90,5 @@ else:
             modify=args.modify, 
             description=args.description, 
             study_id=args.id, 
-            checkForFileEndings=args.ignore_check)
+            checkForFileEndings=args.ignore_check,
+            forceRescaleSlope=args.forceRescaleSlope)
