@@ -1,5 +1,6 @@
 # Ignore BUILD folder
 build/
+build_ubuntu2004
 
 # Ignore user config-file
 dicom/config.ini
