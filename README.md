@@ -1,6 +1,7 @@
 # rh-scripts
-Private scripts used at CAAI group at Rigshospitalet
-Most scripts are compatible with most python versions.
+Private scripts used at CAAI group at Rigshospitalet  
+
+Most scripts are compatible with most python versions.  
 Some scripts require python3.8+.
 
 ## HOW TO INSTALL
