@@ -628,3 +628,102 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
     except InvalidDicomError:
         print("Could not read DICOM RTX file",args.RTX)
         exit(-1)
+
+def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
+
+    """Convert CT-HU to LAC @ 511 keV
+
+    Parameters
+    ----------
+    infile : string
+        Path to the input mnc file   
+    outfile : string
+        Path to the outputmnc file 
+    kvp : int, optional
+        Integer that specify the kVp on CT scan (overwrites the search for a value)       
+    mrac: boolean, optional
+        if set, scales the LAC [cm^-1] by 10000
+    verbose : boolean, optional
+        Set the verbosity       
+    Examples
+    --------
+    >>> from rhscripts.conversion import hu2lac
+    >>> hu2lac('CT_hu.mnc',CT_lac.mnc',kvp = 120)
+    """
+    if not kvp:
+        kvp = os.popen('mincinfo -attvalue dicom_0x0018:el_0x0060 ' + infile + ' -error_string noKVP').read().rstrip()
+        if kvp == 'noKVP':
+            print('Cant find KVP in header. Are you sure this a CT image?')
+            return
+        else:
+            kvp = int(kvp)
+    print('kvp = ' + str(kvp))            
+
+    if mrac:
+        fscalefactor = 10000
+    else:
+        fscalefactor = 1
+        
+    if kvp==100:
+        cmd = 'minccalc -expression \"if(A[0]<52){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000443+0.0544)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
+    elif kvp == 120:
+        cmd = 'minccalc -expression \"if(A[0]<47){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000510+0.0471)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
+    else:
+        print('No conversion for this KVP!')
+        return        
+
+    if verbose:
+        print(cmd)
+
+    os.system(cmd)
+
+
+def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
+
+    """Convert LAC @ 511 keV to  CT-HU
+
+    Parameters
+    ----------
+    infile : string
+        Path to the input mnc file   
+    outfile : string
+        ath to the outputmnc file 
+    kvp : int, optional
+        Integer that specify the kVp on CT scan (overwrites the search for a value)     
+    mrac: boolean, optional
+        if set, accounts for the fact that LAC [cm^-1] is multiplyed by 10000
+    verbose : boolean, optional
+        Set the verbosity        
+    Examples
+    --------
+    >>> from rhscripts.conversion import lac2hu
+    >>> lac2hu('CT_lac.mnc',CT_hu.mnc',kvp = 120)
+    """
+    if not kvp:
+        kvp = os.popen('mincinfo -attvalue dicom_0x0018:el_0x0060 ' + infile + ' -error_string noKVP').read().rstrip()
+        if kvp == 'noKVP':
+            print('Cant find KVP in header. Are you sure this a CT image?')
+            return
+        else:
+            kvp = int(kvp)
+    print('kvp = ' + str(kvp))       
+        
+    if mrac:
+        fscalefactor = 10000
+    else:
+        fscalefactor = 1
+        
+    if kvp==100:
+        breakpoint = ((52+1000)*0.000096)*fscalefactor
+        cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0544)/0.0000443 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
+    elif kvp == 120:
+        breakpoint = ((47+1000)*0.000096)*fscalefactor        
+        cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0471)/0.0000510 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
+    else:
+        print('No conversion for this KVP!')
+        return
+
+    if verbose:
+        print(cmd)
+    
+    os.system(cmd)                 
