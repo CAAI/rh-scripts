@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-version = '0.1.1'
+version = '0.1.2'
 git_revision = ''
 
 """
@@ -19,6 +19,7 @@ VERSIONING
   0.0.12 # mnc2dcm4D fixed with PET values above LargestPixelValue 32767
   0.1.0 # Added hu2lac and lac2hu 
   0.1.1 # Merging develop_claes with mnc2dcm functionality updates handle PET images
+  0.1.2 # Added LMParser that can read and parse LLM files
 """
 
 def __show_version__():
