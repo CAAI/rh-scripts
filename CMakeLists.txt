@@ -20,6 +20,10 @@ INSTALL(PROGRAMS conversion/dicom_to_minc.py
     OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ
   DESTINATION
     bin )
+
+# Add symlinks
+ADD_CUSTOM_TARGET(link_target ALL
+	COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_INSTALL_PREFIX}/rhscripts/lmparser.py ${CMAKE_INSTALL_PREFIX}/bin/LMParser)
     
 # Move config file, if it exists, to share folder
 INSTALL(FILES dicom/config-default.ini DESTINATION share)
