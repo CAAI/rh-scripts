@@ -44,6 +44,56 @@ class TestAnonymize(unittest.TestCase):
         for tag in tags_deleted:
             if tag in self.ds_untouched:
                 self.assertTrue( tag not in ds )
-
+                
+                
+    def test_uid_1( self ):
+        """
+        All UIDs should be replaced
+        """
+        
+        # Set up class
+        anon = Anonymize()
+        
+        # Anonymize
+        ds = anon.anonymize_dataset( self.ds, replaceUIDs=True ) 
+        
+        self.assertNotEqual( ds.StudyInstanceUID, self.ds_untouched.StudyInstanceUID )
+        self.assertNotEqual( ds.SeriesInstanceUID, self.ds_untouched.SeriesInstanceUID )
+        self.assertNotEqual( ds.SOPInstanceUID, self.ds_untouched.SOPInstanceUID )
+        
+    def test_uid_2( self ):
+        """
+        Only SOP UID should be replaced
+        """
+        
+        # Set up class
+        anon = Anonymize()
+        
+        # Anonymize
+        ds = anon.anonymize_dataset( self.ds, replaceUIDs=True, 
+                                     studyInstanceUID=self.ds.StudyInstanceUID,
+                                     seriesInstanceUID=self.ds.SeriesInstanceUID ) 
+        
+        self.assertEqual( ds.StudyInstanceUID, self.ds_untouched.StudyInstanceUID )
+        self.assertEqual( ds.SeriesInstanceUID, self.ds_untouched.SeriesInstanceUID )
+        self.assertNotEqual( ds.SOPInstanceUID, self.ds_untouched.SOPInstanceUID )
+        
+    def test_uid_3( self ):
+        """
+        Only Study UID should be kept
+        """
+        
+        # Set up class
+        anon = Anonymize()
+        
+        # Anonymize
+        ds = anon.anonymize_dataset( self.ds, replaceUIDs=True, 
+                                     studyInstanceUID=self.ds.StudyInstanceUID ) 
+        
+        self.assertEqual( ds.StudyInstanceUID, self.ds_untouched.StudyInstanceUID )
+        self.assertNotEqual( ds.SeriesInstanceUID, self.ds_untouched.SeriesInstanceUID )
+        self.assertNotEqual( ds.SOPInstanceUID, self.ds_untouched.SOPInstanceUID )
+        
+        
 if __name__ == '__main__':
     unittest.main()
