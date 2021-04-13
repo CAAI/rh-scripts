@@ -15,6 +15,12 @@ make install
 ## POST INSTALLATION
 Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
 
+## CHECK INSTALLATION
+Perform unittest for python scripts.
+```
+python -m unittest discover -s /opt/caai/tests -v
+```
+
 ## KNOWN ISSUES
 
 ### Install on ubuntu

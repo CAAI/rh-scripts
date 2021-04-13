@@ -10,6 +10,7 @@ from shutil import copyfile
 import datetime
 from rhscripts.conversion import findExtension
 from pathlib import Path
+from typing import Optional
 
 class Anonymize:
     """
@@ -61,16 +62,16 @@ class Anonymize:
         """
         return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(self.__generate_uid(),i)
     
-    def anonymize(self, filename: str, output_filename: str, new_person_name: str="anonymous", 
-                  studyInstanceUID:str =None, seriesInstanceUID: str=None, replaceUIDs: bool=False):
+    def anonymize_dataset(self, dataset: dicom.dataset.Dataset, new_person_name: str="anonymous", 
+                  studyInstanceUID: str=None, seriesInstanceUID: str=None, replaceUIDs: bool=False) -> dicom.dataset.Dataset:
         """ Anonymize a single slice
         
         Parameters
         ----------
         filename: str
             Dicom file to be read and anonymized
-        output_filename: str
-            Dicom file to be written
+        output_filename: str, optional
+            Dicom file to be written when file is saved
         new_person_name: str, optional
             Name to replace all PN tags as well as PatientID
         studyInstanceUID: str, optional
@@ -79,6 +80,10 @@ class Anonymize:
             Overwrite instead of generating new. Used to make sure all slices have same SeriesInstanceUID.
         replaceUIDs: bool, optional
             Forces replacement of UIDs. Must be True when studyInstanceUID or seriesInstanceUID is set.
+            
+        Return
+        ------
+        Anonymized dicom dataset
         """
         
         new_person_name = "anonymous" if new_person_name == None else new_person_name
@@ -87,9 +92,6 @@ class Anonymize:
             """Called from the dataset "walk" recursive function for all data elements."""
             if data_element.VR == "PN":
                 data_element.value = new_person_name
-
-        # Load the current dicom file to 'anonymize'
-        dataset = dicom.read_file(filename)
     
         # Remove patient name and any other person names
         dataset.walk(__PN_callback)
@@ -119,19 +121,41 @@ class Anonymize:
             
         # Replace InstanceUIDs
         if replaceUIDs:
-            assert studyInstanceUID is not None # Must be set on folder level
-            assert seriesInstanceUID is not None # Must be set on folder level
-            dataset.StudyInstanceUID = studyInstanceUID
-            dataset.SeriesInstanceUID = seriesInstanceUID
+            dataset.StudyInstanceUID = studyInstanceUID if studyInstanceUID is not None else self.generate_StudyInstanceUID()
+            dataset.SeriesInstanceUID = seriesInstanceUID if seriesInstanceUID is not None else self.generate_SeriesInstanceUID()
             dataset.SOPInstanceUID = self.generate_SOPInstanceUID(dataset.InstanceNumber)
     
+        return dataset
+        
+    def anonymize_file( self, filename: str, output_filename: str, new_person_name: str="anonymous", 
+                  studyInstanceUID: str=None, seriesInstanceUID: str=None, replaceUIDs: bool=False):
+        """ Anonymize a single slice
+        
+        Parameters
+        ----------
+        filename: str
+            Dicom file to be read and anonymized
+        output_filename: str
+            Dicom file to be written
+        """
+        # Load the current dicom file to 'anonymize'
+        ds = dicom.read_file(filename)
+        
+        if replaceUIDs:
+            assert studyInstanceUID is not None # Must be set on folder level
+            assert seriesInstanceUID is not None # Must be set on folder level
+            
+        # Anonymize
+        ds = anonymize_dataset( dataset=ds, new_person_name=new_person_name, studyInstanceUID=studyInstanceUID,
+                                seriesInstanceUID=seriesInstanceUID, replaceUIDs=replaceUIDs )
+        
         # Overwrite filename
         if self.sort_by_instance_number:
             output_filename = "dicom"+str(dataset.InstanceNumber).zfill(4)+'.dcm'
-    
+            
         # write the 'anonymized' DICOM out under the new filename
-        dataset.save_as(output_filename)   
-    
+        ds.save_as(output_filename) 
+        
     def anonymize_folder(self,foldername: str,output_foldername: str, 
                          new_person_name: str="anonymous", overwrite_ending: bool=False, 
                          ending_suffix: str='.dcm', studyInstanceUID: str=None,
@@ -184,7 +208,7 @@ class Anonymize:
             if not os.path.isdir(os.path.join(foldername, filename)):
                 if self.verbose:
                     print(filename + " -> " + filename_out + "...")
-                self.anonymize(os.path.join(foldername, filename), os.path.join(output_foldername, filename_out),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
+                self.anonymize_file(os.path.join(foldername, filename), os.path.join(output_foldername, filename_out),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
                 if self.verbose:
                     print("done\r")
             else:
