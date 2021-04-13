@@ -7,8 +7,192 @@ except ImportError:
 import configparser
 import glob
 from shutil import copyfile
-
+import datetime
 from rhscripts.conversion import findExtension
+from pathlib import Path
+
+class Anonymize:
+    """
+    Anonymize script for DICOM file or folder containing dicom files
+    Simply removes or replaces patient sensitive information.
+    
+    from rhscripts.dcm import Anonymize
+    anon = Anonymize()
+    anon.anonymize_folder(dicom_original_folder,dicom_anonymized_folder)
+    """
+    
+    def __init__( self, verbose: bool=False, remove_private_tags: bool=False, sort_by_instance_number: bool=False ):
+        """
+        Parameters
+        ----------
+        verbose : bool, optional
+            Print progress. The default is False.
+        remove_private_tags : bool, optional
+            Remove the private tags. The default is False.
+        sort_by_instance_number : bool, optional
+            Overwrites the output file to contain InstanceNumber ("dicom<04d:InstanceNumber>.dcm"). The default is False.
+        """
+        self.verbose = verbose
+        self.remove_private_tags = remove_private_tags
+        self.sort_by_instance_number = sort_by_instance_number
+    
+    def __generate_uid(self) -> str:
+        """ Generate and return a new UID """
+        UID = str(datetime.datetime.now())
+        for symbol in ['-',' ',':','.']:
+            UID = UID.replace(symbol,'')
+        return UID
+    
+    def generate_StudyInstanceUID(self) -> str:
+        """ Generate and return a new StudyInstanceUID """
+        return '1.3.51.0.1.1.10.143.20.159.{}.7754590'.format(self.__generate_uid())
+    
+    def generate_SeriesInstanceUID(self) -> str:
+        """ Generate and return a new SeriesInstanceUID """
+        return '1.3.12.2.1107.5.2.38.51014.{}11111.0.0.0'.format(self.__generate_uid())
+    
+    def generate_SOPInstanceUID(self,i: int) -> str:
+        """ Generate and return a new SOPInstanceUID
+        
+        Parameters
+        ----------
+        i : int
+            Running number, typically InstanceNumber of the slice
+        """
+        return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(self.__generate_uid(),i)
+    
+    def anonymize(self, filename: str, output_filename: str, new_person_name: str="anonymous", 
+                  studyInstanceUID:str =None, seriesInstanceUID: str=None, replaceUIDs: bool=False):
+        """ Anonymize a single slice
+        
+        Parameters
+        ----------
+        filename: str
+            Dicom file to be read and anonymized
+        output_filename: str
+            Dicom file to be written
+        new_person_name: str, optional
+            Name to replace all PN tags as well as PatientID
+        studyInstanceUID: str, optional
+            Overwrite instead of generating new. Used when processing multiple series one by one.
+        seriesInstanceUID: str, optional
+            Overwrite instead of generating new. Used to make sure all slices have same SeriesInstanceUID.
+        replaceUIDs: bool, optional
+            Forces replacement of UIDs. Must be True when studyInstanceUID or seriesInstanceUID is set.
+        """
+        
+        new_person_name = "anonymous" if new_person_name == None else new_person_name
+    
+        def __PN_callback(ds, data_element):
+            """Called from the dataset "walk" recursive function for all data elements."""
+            if data_element.VR == "PN":
+                data_element.value = new_person_name
+
+        # Load the current dicom file to 'anonymize'
+        dataset = dicom.read_file(filename)
+    
+        # Remove patient name and any other person names
+        dataset.walk(__PN_callback)
+    
+        # Remove data elements (should only do so if DICOM type 3 optional) 
+        for name in ['OtherPatientIDs', 'OtherPatientIDsSequence']:
+            if name in dataset:
+                delattr(dataset, name)
+    
+        # Same as above but for blanking data elements that are type 2.
+        for name in ['PatientBirthDate','PatientAddress','PatientTelephoneNumbers']:
+            if name in dataset:
+                dataset.data_element(name).value = ''
+    
+        # Overwrite PatientID
+        dataset.data_element('PatientID').value = new_person_name
+        
+        # Overwrite AccessionNumber and StudyID
+        if 'AccessionNumber' in dataset:
+            dataset.data_element('AccessionNumber').value = new_person_name
+        if 'StudyID' in dataset:
+            dataset.data_element('StudyID').value = new_person_name
+    
+        # Remove private tags
+        if self.remove_private_tags:
+            dataset.remove_private_tags()
+            
+        # Replace InstanceUIDs
+        if replaceUIDs:
+            assert studyInstanceUID is not None # Must be set on folder level
+            assert seriesInstanceUID is not None # Must be set on folder level
+            dataset.StudyInstanceUID = studyInstanceUID
+            dataset.SeriesInstanceUID = seriesInstanceUID
+            dataset.SOPInstanceUID = self.generate_SOPInstanceUID(dataset.InstanceNumber)
+    
+        # Overwrite filename
+        if self.sort_by_instance_number:
+            output_filename = "dicom"+str(dataset.InstanceNumber).zfill(4)+'.dcm'
+    
+        # write the 'anonymized' DICOM out under the new filename
+        dataset.save_as(output_filename)   
+    
+    def anonymize_folder(self,foldername: str,output_foldername: str, 
+                         new_person_name: str="anonymous", overwrite_ending: bool=False, 
+                         ending_suffix: str='.dcm', studyInstanceUID: str=None,
+                         replaceUIDs: bool=False):
+        """ Function to anonymize all files in the folder and subfolders.
+
+        Parameters
+        ----------
+        foldername : str
+            Input folder with dcm files in root or subfolder
+        output_foldername : str
+            Output folder. Will be created if it doesnt exist.
+        new_person_name : str, optional
+            Name to replace all PN tags as well as PatientID
+        overwrite_ending : bool, optional
+            Replace the extension to .dcm or whatever the input file uses. The default is False.
+        ending_suffix : str, optional
+            Set the suffix manually. The default is '.dcm'.
+        studyInstanceUID : str, optional
+            Overwrite instead of generating new. If set, remember to set replaceUIDs. The default is None.
+        replaceUIDs : bool, optional
+            Forces replacement of UIDs. Must be True when studyInstanceUID is set. The default is False.
+
+        Raises
+        ------
+        IOError
+            When output is not a directory.
+
+        """
+        
+        if os.path.exists(output_foldername):
+            if not os.path.isdir(output_foldername):
+                raise IOError("Input is directory; output name exists but is not a directory")
+        else: # out_dir does not exist; create it.
+            os.makedirs(output_foldername)
+    
+        if len(os.listdir(foldername)) > 9999:
+            exit('Too many files in folder for script..')
+            
+        # Check for replaceUIDs:
+        if replaceUIDs:
+            if studyInstanceUID is None: studyInstanceUID = self.generate_StudyInstanceUID()
+            seriesInstanceUID = self.generate_SeriesInstanceUID()
+    
+        for fid,filename in enumerate(os.listdir(foldername)):
+            ending = '.dcm' if os.path.splitext(filename)[1]=='' else os.path.splitext(filename)[1]
+            if overwrite_ending:
+                ending = ending_suffix
+            filename_out = "dicom"+str(fid+1).zfill(4)+ending
+            if not os.path.isdir(os.path.join(foldername, filename)):
+                if self.verbose:
+                    print(filename + " -> " + filename_out + "...")
+                self.anonymize(os.path.join(foldername, filename), os.path.join(output_foldername, filename_out),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
+                if self.verbose:
+                    print("done\r")
+            else:
+                if self.verbose:
+                    print("Found",filename,"\r")
+                self.anonymize_folder(os.path.join(foldername, filename),os.path.join(output_foldername, filename),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
+
+""" ANONYMIZE END """
 
 def get_description(file):
     """Get the SeriesDescription of a dicom file

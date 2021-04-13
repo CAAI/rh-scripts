@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-version = '0.1.2'
+version = '0.1.3'
 git_revision = ''
 
 """
@@ -20,6 +20,7 @@ VERSIONING
   0.1.0 # Added hu2lac and lac2hu 
   0.1.1 # Merging develop_claes with mnc2dcm functionality updates handle PET images
   0.1.2 # Added LMParser that can read and parse LLM files
+  0.1.3 # Added DICOM anonymize functionality
 """
 
 def __show_version__():
