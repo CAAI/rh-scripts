@@ -164,7 +164,7 @@ class LMParser:
         self.__set_relative_to_end( self.LMDataIDLen ) 
         if not (PTDtype := self.LMFile.read(self.LMDataIDLen).decode('utf-8')) == self.LMDataID:
             sys.exit(f'String {PTDtype} does not match {self.LMDataID}')
-        self.__print(f"PTD file is {self.LMDataID}")
+        self.__print(f"PTD file is {PTDtype}")
         
     def __prepare_lm_file( self ):                    
         # Rewind and prepare for reading
