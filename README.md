@@ -28,7 +28,7 @@ If you installed via CMAKE, add "source /opt/caai/toolkit-config.sh" to .bashrc 
 
 ### Config.ini
 If you need to use the scripts to move data to e.g. DALI / VIA3 servers, you need to set up your config.
-In the downladed folder, do:
+In the downloaded folder, do:
 ```
 cp dicom/config-default.ini /opt/caai/share/config.ini
 ```
