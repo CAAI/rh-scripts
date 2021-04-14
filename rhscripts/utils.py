@@ -53,7 +53,7 @@ class LMParser:
         self.filename = Path( ptd_file )
         self.out_folder = Path(out_folder if out_folder is not None else self.filename.parent)
         self.out_folder.mkdir(parents=True,exist_ok=True)
-        self.anonymize = anonymize # NOT YET IMPLEMENTED..
+        self.anonymize = anonymize
         self.verbose = verbose
         # Globals
         self.BytesReady = 0
@@ -118,8 +118,20 @@ class LMParser:
         self.__print("Closed files")
         self.__print("Done parsing in {:.0f} seconds".format( time.time()-self.start_time))
         
-    def return_converted_dicom_header( self ) -> pydicom.dataset.FileDataset:
-        return pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) ) 
+    def return_converted_dicom_header( self, anonymize_id: str=None, studyInstanceUID: str=None, 
+                                       seriesInstanceUID: str=None, replaceUIDs: bool=False ) -> pydicom.dataset.FileDataset:
+        """
+        Return the DICOM header from the PTD file.
+        """
+        ds = pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) )
+        if self.anonymize:
+            from rhscripts.dcm import Anonymize
+            anon = Anonymize()
+            ds = anon.anonymize_dataset(ds, new_person_name=anonymize_id, 
+                                        studyInstanceUID=studyInstanceUID, 
+                                        seriesInstanceUID=seriesInstanceUID, 
+                                        replaceUIDs=replaceUIDs)
+        return ds 
     
     def save_dicom( self, out_dicom: str ):
         dcm_file = self.out_folder.joinpath( out_dicom )

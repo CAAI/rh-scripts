@@ -1,4 +1,4 @@
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 git_revision = ''
 
 """
@@ -20,6 +20,7 @@ VERSIONING
   0.1.1 # Merging develop_claes with mnc2dcm functionality updates handle PET images
   0.1.2 # Added LMParser that can read and parse LLM files
   0.1.3 # Added DICOM anonymize functionality
+  0.1.4 # Added anonymize function to LMParser
 """
 
 def __show_version__():
