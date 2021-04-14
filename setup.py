@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+
+from setuptools import setup, find_packages
+from pythontoolkit.version import __version__
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+    
+setup(
+     name='rhscripts',  
+     version=__version__,
+     author="Claes Ladefoged",
+     author_email="claes.noehr.ladefoged@regionh.dk",
+     description="Scripts used at CAAI",
+     long_description=long_description,
+     long_description_content_type="text/markdown",
+     url="https://github.com/CAAI/rh-scripts",
+     scripts=['dicom/anonymize_dicom.py'] ,
+     packages=setuptools.find_packages(),
+     install_requires=[
+         'pyminc',
+         'pydicom',
+         'opencv-python',
+         
+    ],
+    classifiers=[
+        'Programming Language :: Python :: 3.8',
+    ],
+ )
