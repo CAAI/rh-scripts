@@ -340,14 +340,18 @@ def send_data(folder, server=None, checkForEndings=True):
     if not checkForEndings or isinstance(f,str):
         
         # Setup
-        caai_dir = os.environ['CAAI']
-        config_path = '%s/share/config.ini' % caai_dir
-        if not os.path.exists(config_path):
-            print('You do not have a config.ini file in %s' % caai_dir)
+        if os.environ.get('CAAI') is not None:
+            caai_dir = os.environ['CAAI']
+            config_path = '%s/share/config.ini' % caai_dir
+            if not os.path.exists(config_path):
+                print('You do not have a config.ini file in %s' % caai_dir)
+                return
+            config = configparser.ConfigParser()
+            config.sections()
+            config.read(config_path)
+        else:
+            print('CAAI install path is not set in your environment')
             return
-        config = configparser.ConfigParser()
-        config.sections()
-        config.read(config_path)
         
         if not server:
             print('You need to select a server from config.ini')

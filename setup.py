@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages
-from pythontoolkit.version import __version__
+from rhscripts.version import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -29,7 +29,7 @@ setup(
          'pyminc',
          'pydicom',
          'opencv-python',
-         
+         'matplotlib'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',

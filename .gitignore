@@ -9,4 +9,6 @@ dicom/config.ini
 .DS_STORE
 
 # Ignore PYTHON cache
-__pycache___
+__pycache__
+rhscripts/__pycache__
+rhscripts.egg-info
