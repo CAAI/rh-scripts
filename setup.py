@@ -23,6 +23,7 @@ setup(
   	    	 'conversion/rtdose2mnc.py',
   	    	 'conversion/hu2lac.py',
           	 'conversion/lac2hu.py',
+             'utils/lmparser.py'
     ],
      packages=setuptools.find_packages(),
      install_requires=[
