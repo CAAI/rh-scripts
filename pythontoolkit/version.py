@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-version = '0.1.3'
+__version__ = '0.1.3'
 git_revision = ''
 
 """
@@ -24,5 +23,5 @@ VERSIONING
 """
 
 def __show_version__():
-	print('RH-scripts version: %s' % version)
+	print('RH-scripts version: %s' % __version__)
 	#print('Git revision: %s' % git_revision)
