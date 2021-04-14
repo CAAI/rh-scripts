@@ -5,7 +5,18 @@ Most scripts are compatible with most python versions.
 Some scripts require python3.8+.
 
 ## HOW TO INSTALL
+
+### Using pip
+Install only to your user. Go to your virtual environment. Run:
 ```
+git clone https://github.com/CAAI/rh-scripts.git && cd rh-scripts
+pip install -e
+```
+
+### Using Cmake
+To install files system-wide.
+```
+git clone https://github.com/CAAI/rh-scripts.git && cd rh-scripts
 pip3 install -r requirements.txt
 mkdir build && cd build
 cmake ..
