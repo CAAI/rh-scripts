@@ -3,7 +3,7 @@
 import os
 import itertools
 import numpy as np
-import sys, random, typing, time, argparse, pydicom
+import sys, random, typing, time, pydicom
 from pathlib import Path
 
 def listdir_nohidden(path):

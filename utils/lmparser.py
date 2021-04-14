@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from rhscripts.utils import LMParser
+import argparse
 
 __scriptname__ = 'lmparser'
 __version__ = '0.0.1'
