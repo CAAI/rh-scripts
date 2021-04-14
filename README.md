@@ -23,7 +23,17 @@ cmake ..
 make && make install
 ```
 ## POST INSTALLATION
-Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
+If you installed via CMAKE, add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile  
+
+
+### Config.ini
+If you need to use the scripts to move data to e.g. DALI / VIA3 servers, you need to set up your config.
+In the downladed folder, do:
+```
+cp dicom/config-default.ini /opt/caai/share/config.ini
+```
+Create the folder if it does not exists. After this, modify the tags needed in the config file, e.g. setting your own AET and add each server you need to transfer data to.
+
 
 ## CHECK INSTALLATION
 Perform unittest for python scripts.
