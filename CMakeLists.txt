@@ -7,7 +7,7 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 # Add python-lib
-ADD_SUBDIRECTORY( pythontoolkit )
+ADD_SUBDIRECTORY( rhscripts )
 
 # Install programs into bin
 INSTALL(PROGRAMS conversion/dicom_to_minc.py

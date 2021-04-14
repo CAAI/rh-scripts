@@ -15,7 +15,15 @@ setup(
      long_description=long_description,
      long_description_content_type="text/markdown",
      url="https://github.com/CAAI/rh-scripts",
-     scripts=['dicom/anonymize_dicom.py'] ,
+     scripts=[
+             'dicom/anonymize_dicom.py',
+             'conversion/dicom_to_minc.py',
+  	    	 'conversion/rtx2mnc.py',
+  	    	 'conversion/mnc2dcm.py',
+  	    	 'conversion/rtdose2mnc.py',
+  	    	 'conversion/hu2lac.py',
+          	 'conversion/lac2hu.py',
+    ],
      packages=setuptools.find_packages(),
      install_requires=[
          'pyminc',
