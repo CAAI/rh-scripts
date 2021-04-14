@@ -5,13 +5,14 @@ from rhscripts.version import __show_version__
 import pyminc.volumes.factory as pyminc
 
 __scriptname__ = 'mnc2dcm'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 """
 
 VERSIONING
   0.0.1 # Created script
   0.0.2 # Added option to ignore the check for dicom files
+  0.0.3 # Added rescale slope and intercept for PET files
 
 """
 
