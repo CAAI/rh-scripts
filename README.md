@@ -10,7 +10,7 @@ Some scripts require python3.8+.
 Install only to your user. Go to your virtual environment. Run:
 ```
 git clone https://github.com/CAAI/rh-scripts.git && cd rh-scripts
-pip install -e
+pip install -e .
 ```
 
 ### Using Cmake
