@@ -1,4 +1,4 @@
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 git_revision = ''
 
 """
@@ -21,6 +21,7 @@ VERSIONING
   0.1.2 # Added LMParser that can read and parse LLM files
   0.1.3 # Added DICOM anonymize functionality
   0.1.4 # Added anonymize function to LMParser
+  0.1.5 # LMParser can return number of prompt/delayed events over time
 """
 
 def __show_version__():
