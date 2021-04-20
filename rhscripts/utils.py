@@ -121,10 +121,16 @@ class LMParser:
     def return_converted_dicom_header( self ) -> pydicom.dataset.FileDataset:
         return pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) ) 
     
+    def get_type_from_dicom(self, dcm_file):
+        return (pydicom.dcmread(dcm_file))[0x29, 0x1008].value
+    
     def save_dicom( self, out_dicom: str ):
         dcm_file = self.out_folder.joinpath( out_dicom )
         self.return_converted_dicom_header().save_as( str( dcm_file.absolute() ) )
+        tag = self.get_type_from_dicom(dcm_file)
+        self.__print("!!!!!Dicom header type: {}".format(tag))
         self.__print("Saved DICOM to: {}".format(dcm_file))
+        
         
     """ PRIVATE FUNCTIONS """
     
