@@ -417,7 +417,7 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
 
     """
     
-    def sort_files(p,sort_type):
+    def sort_files(p):
         return {dicom.read_file(str(d)).InstanceNumber : d for d in Path(p).iterdir() }
 
     # Get dictionary with key=InstanceNumber val=Path-object for the file
@@ -441,4 +441,4 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
         if SeriesDescription is not None: ds_container.SeriesDescription = SeriesDescription
         if SeriesNumber is not None: ds_container.SeriesNumber = SeriesNumber        
 
-        ds_container.save_as(f'{out_folder}/dicom_{i:03d}.dcm')
+        ds_container.save_as(f'{out_folder}/dicom_{i:04d}.dcm')
