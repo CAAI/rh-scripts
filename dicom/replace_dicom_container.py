@@ -25,8 +25,19 @@ Swap the PixelDate of one dicom dataset into another container dicom dataset
 
 -----------------------------------------------------------------
 
-### USAGE
-TBC
+### USAGE: replace_dicom_container.py [-h] [--series_number SERIES_NUMBER] [--series_description SERIES_DESCRIPTION] in_folder container out_folder
+
+positional arguments:
+  in_folder             Folder with new dicom files.
+  container             Folder with container dicom files.
+  out_folder            Folder with resulting dcm files.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --series_number SERIES_NUMBER
+                        SeriesNumber, used to match the files in the folders
+  --series_description SERIES_DESCRIPTION
+                        Replace the name of the series
 
 -----------------------------------------------------------------
 
