@@ -30,7 +30,8 @@ setup(
          'pyminc',
          'pydicom',
          'opencv-python',
-         'matplotlib'
+         'matplotlib',
+         'pandas'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',
