@@ -79,6 +79,8 @@ class LMParser:
         random.seed(self.seed)
         # Setup LM file
         self.__prepare_lm_file()
+        # Check if lm file is LISTMODE
+        assert self.get_type_from_dicom() == 'PET_LISTMODE_T'
         
         for word in self.__read_list():
             int_word = int.from_bytes(word,byteorder='little')
@@ -121,14 +123,13 @@ class LMParser:
     def return_converted_dicom_header( self ) -> pydicom.dataset.FileDataset:
         return pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) ) 
     
-    def get_type_from_dicom(self, dcm_file):
-        return (pydicom.dcmread(dcm_file))[0x29, 0x1008].value
+    # Extract DICOM header tag (0029,1008)
+    def get_type_from_dicom( self ) -> str:
+        return self.return_converted_dicom_header()[0x29, 0x1008].value
     
     def save_dicom( self, out_dicom: str ):
         dcm_file = self.out_folder.joinpath( out_dicom )
         self.return_converted_dicom_header().save_as( str( dcm_file.absolute() ) )
-        tag = self.get_type_from_dicom(dcm_file)
-        self.__print("!!!!!Dicom header type: {}".format(tag))
         self.__print("Saved DICOM to: {}".format(dcm_file))
         
         
