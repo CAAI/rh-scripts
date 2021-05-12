@@ -372,3 +372,73 @@ def send_data(folder, server=None, checkForEndings=True):
                 folder)
         
         os.system(cmd)
+        
+def generate_uid_suffix() -> str:
+    """ Generate and return a new UID """
+    UID = str(datetime.datetime.now())
+    for symbol in ['-',' ',':','.']:
+        UID = UID.replace(symbol,'')
+    return UID
+
+def generate_StudyInstanceUID() -> str:
+    """ Generate and return a new StudyInstanceUID """
+    return '1.3.51.0.1.1.10.143.20.159.{}.7754590'.format(generate_uid_suffix())
+    
+def generate_SeriesInstanceUID() -> str:
+    """ Generate and return a new SeriesInstanceUID """
+    return '1.3.12.2.1107.5.2.38.51014.{}11111.0.0.0'.format(generate_uid_suffix())
+
+def generate_SOPInstanceUID(i: int) -> str:
+    """ Generate and return a new SOPInstanceUID
+    
+    Parameters
+    ----------
+    i : int
+        Running number, typically InstanceNumber of the slice
+    """
+    return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(generate_uid_suffix(),i)
+        
+def replace_container(in_folder: str, container: str, out_folder: str, SeriesNumber: int=None, SeriesDescription: str=None):
+    """
+    
+    Parameters
+    ----------
+    in_folder : str
+        Path to folder with files containing PixelData that should be kept.
+    container : str
+        Path to folder with files that should be used as container, getting only PixelData replaced 
+        (alongside UIDs and optionally SeriesNumber and SeriesDescription).
+    out_folder : str
+        Folder to store resulting output.
+    SeriesNumber : int, optional
+        Overwrite the number of the series. The default is None.
+    SeriesDescription : str, optional
+        Overwrite the name of the series. The default is None.
+
+    """
+    
+    def sort_files(p):
+        return {dicom.read_file(str(d)).InstanceNumber : d for d in Path(p).iterdir() }
+
+    # Get dictionary with key=InstanceNumber val=Path-object for the file
+    d_new = sort_files(in_folder)
+    d_container = sort_files(container)
+    
+    # Create output folder   
+    Path(out_folder).mkdir(exist_ok=True,parents=True)
+    
+    # For each slice, 1-indexed due to InstanceNumber key
+    for i in range(1,len(d_new)+1):
+        
+        ds_container=dicom.read_file(str(d_container[i]))
+        ds_new=dicom.read_file(str(d_new[i]))
+        
+        ds_container.PixelData = ds_new.PixelData
+        
+        ds_container.SeriesInstanceUID = generate_SeriesInstanceUID()
+        ds_container.SOPInstanceUID = generate_SOPInstanceUID( i )
+        
+        if SeriesDescription is not None: ds_container.SeriesDescription = SeriesDescription
+        if SeriesNumber is not None: ds_container.SeriesNumber = SeriesNumber        
+
+        ds_container.save_as(f'{out_folder}/dicom_{i:04d}.dcm')

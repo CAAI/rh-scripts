@@ -1,9 +1,9 @@
-__version__ = '0.1.4'
+__version__ = '0.1.6'
 git_revision = ''
 
 """
 
-VERSIONING
+VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.0.1 # Added conversion script and minimal example functions
   0.0.2 # Added mnc2dcm functionality
   0.0.3 # Added comments to pythontoolkit
@@ -21,6 +21,8 @@ VERSIONING
   0.1.2 # Added LMParser that can read and parse LLM files
   0.1.3 # Added DICOM anonymize functionality
   0.1.4 # Added anonymize function to LMParser
+  0.1.5 # LMParser can return number of prompt/delayed events over time
+  0.1.6 # Added replace_dicom_container function
 """
 
 def __show_version__():

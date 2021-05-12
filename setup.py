@@ -17,6 +17,7 @@ setup(
      url="https://github.com/CAAI/rh-scripts",
      scripts=[
              'dicom/anonymize_dicom.py',
+             'dicom/replace_dicom_container.py',
              'conversion/dicom_to_minc.py',
   	    	 'conversion/rtx2mnc.py',
   	    	 'conversion/mnc2dcm.py',
@@ -30,7 +31,8 @@ setup(
          'pyminc',
          'pydicom',
          'opencv-python',
-         'matplotlib'
+         'matplotlib',
+         'pandas'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',

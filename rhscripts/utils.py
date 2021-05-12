@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import sys, random, typing, time, pydicom
 from pathlib import Path
+import pandas as pd
 
 def listdir_nohidden(path):
     """List dir without hidden files
@@ -110,6 +111,39 @@ class LMParser:
         
         # Write DICOM header etc back to file
         self.__write_header()
+        
+    def return_LM_statistics( self ) -> pd.DataFrame:
+        # Setup LM file
+        self.__prepare_lm_file()
+        
+        dict_prompts = {0:0}
+        dict_delays = {0:0}
+        timestamp = 0
+        for word in self.__read_list():
+            int_word = int.from_bytes(word,byteorder='little')
+            if (int_word & 0x80000000) == 0x80000000:
+                # TAG WORD
+                if (int_word >> 28 & 0xe) == 0x8:
+                    if (listms := int_word & 0x1fffffff) > 0 and listms % 1000 == 0:
+                        timestamp = listms/1000
+                        dict_prompts[timestamp] = 0 
+                        dict_delays[timestamp] = 0 
+                        self.__print(f"Finished {listms/1000} seconds")
+            else:
+                # EVENT WORD
+                
+                if int_word >> 30 == 0x1: 
+                    dict_prompts[timestamp] += 1
+                else: 
+                    dict_delays[timestamp] += 1 
+        df = pd.DataFrame(columns=['t','type','count'])
+        for k,v in dict_prompts.items():
+            df = df.append({'t': k, 'type':'prompt','numEvents':v},ignore_index=True)
+            df = df.append({'t': k, 'type':'delay', 'numEvents':dict_delays[k]},ignore_index=True)
+        df.t = df.t.astype('float')
+        df.numEvents = df.numEvents.astype('int')
+        self.__print("Done parsing LM words")
+        return df
         
     def close( self ):
         self.LMFile.close()
