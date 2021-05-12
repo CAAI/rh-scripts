@@ -8,6 +8,10 @@ except ImportError:
     import dicom
     from dicom.filereader import InvalidDicomError #For rtx2mnc
 import pyminc.volumes.factory as pyminc
+from pydicom import dcmread
+from nipype.interfaces.dcm2nii import Dcm2niix
+import nibabel as nib
+from pathlib import Path
 import numpy as np
 import datetime
 import cv2
@@ -119,6 +123,29 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
 
     os.system(cmd)
 
+
+def dcm_to_nifty(source_dir, output_dir, out_filename, compress='y'):
+    """Converts a folder containing dicom files (slices) into one nifty file.
+
+    Args:
+        source_dir (str or Path): input directory containing .dcm or .ima files
+        output_dir (str or Path): output directory where nitfy file is saved
+        out_filename (str): name of the output nifty file
+        compress ('y', 'n'): whether output file is .nii.gz ('y') or .nii ('n'). Default is 'y'.
+    """
+    # uncomment that when we have dealt with str vs path objects
+    # dcmcontainer = look_for_dcm_files(source_dir)
+    
+    converter = Dcm2niix()
+    converter.inputs.source_dir = source_dir
+    converter.inputs.compress = compress
+    converter.inputs.output_dir = output_dir
+    converter.inputs.out_filename = out_filename
+    try:
+        converter.run()
+    except Exception as e:
+        print(e)
+        
 
 def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True,forceRescaleSlope=False):  
     """Convert a minc file to dicom
@@ -475,6 +502,157 @@ def mnc_to_dcm_4D(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,
 
     if verbose:
         print("Output written to %s" % dicomfolder)
+
+
+def nft_to_dcm(nftfile,
+               dicomcontainer,
+               dicomfolder,
+               verbose=False,
+               modify=False,
+               description=None,
+               study_id=None,
+               patient_id=None,
+               checkForFileEndings=True,
+               forceRescaleSlope=False):  
+    """Convert a minc file to dicom
+    Parameters
+    ----------
+    nftfile : string or Path object
+        Path to the minc file
+    dicomcontainer : string or Path object
+        Path to the directory containing the dicom container
+    dicomfolder : string or Path object
+        Path to the output dicom folder
+    verbose : boolean, optional
+        Set the verbosity
+    modify : boolean, optional
+        Create new SeriesInstanceUID and SOPInstanceUID
+        Default on if description or id is set
+    description : string, optional
+        Sets the SeriesDescription tag in the dicom files
+    study_id : int, optional
+        Sets the StudyID tag in the dicom files
+    patient_id : int, optional
+        Sets the PatientName and PatientID tag in the dicom files
+    forceRescaleSlope : boolean, optional
+        Forces recalculation of rescale slope
+        
+    Examples
+    --------
+    >>> from rhscripts.conversion import mnc_to_dcm
+    >>> nft_to_dcm('PETCT_new.nii.gz', 'PETCT', 'PETCT_new', description="PETCT_new", id="600")
+    """
+    
+    if verbose:
+        print("Converting to DICOM")
+
+    if description or study_id:
+        modify = True
+    
+    if checkForFileEndings:
+        dcmcontainer = look_for_dcm_files(str(dicomcontainer))
+        if dcmcontainer == -1:
+            print("Could not find dicom files in container..")
+            exit(-1)
+    else:
+        dcmcontainer = dicomcontainer
+        
+    # change path str to path object
+    if isinstance(dcmcontainer, str):
+        dcmcontainer = Path(dcmcontainer) 
+    
+    # gather the dicom slices from the container
+    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
+    
+    # Get information about the dataset from a single file
+    ds = dcmread(dcm_slices[0])
+    
+    # Load the nifti file
+    np_nifti = nib.load(nftfile).get_fdata().astype(ds.pixel_array.dtype)
+    
+    # Check that the correct number of files exists
+    if verbose:
+        print("Checking files ( %d ) equals number of slices ( %d )" % (len(dcm_slices), np_nifti.shape[0]))
+    assert len(dcm_slices) == np_nifti.shape[0]
+    
+    LargestImagePixelValue = int(np.ceil(np_nifti.max()))
+    
+    # Prepare for MODIFY HEADER
+    newSIUID = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+    newSIUID = '1.3.12.2.1107.5.2.38.51014.' + newSIUID + '11111.0.0.0' 
+
+    # Prepare output folder
+    if isinstance(dicomfolder, str):
+        dicomfolder = Path(dicomfolder)
+    dicomfolder.mkdir(parents=True, exist_ok=True)
+
+    # Calculate new rescale slope if not 1
+    RescaleSlope = 1.0
+    doUpdateRescaleSlope = False
+    if hasattr(ds, 'RescaleSlope'):
+        if forceRescaleSlope:
+            RescaleSlope = np.max(np_nifti) / float(ds.LargestImagePixelValue) + 0.000000000001
+            doUpdateRescaleSlope = True
+            if verbose:
+                print(f"Setting RescaleSlope from {ds.RescaleSlope} to {RescaleSlope}")
+        elif not ds.RescaleSlope == RescaleSlope:
+            if np.max(np_nifti) / ds.RescaleSlope + ds.RescaleIntercept > 32767:
+                old_RescaleSlope = ds.RescaleSlope
+                vol_max = np.max(np_nifti)
+                RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
+                doUpdateRescaleSlope = True
+                if verbose:
+                    print("MAX EXCEEDED - RECALCULATING RESCALE SLOPE")
+                    print("WAS: %f\nIS: %f" % (old_RescaleSlope, RescaleSlope))
+            else:
+                RescaleSlope = ds.RescaleSlope
+                
+    # List files, do not need to be ordered
+    for f in dcm_slices:
+        ds = dcmread(f)
+        i = int(ds.InstanceNumber)-1
+
+        # Check inplane-dimension is the same
+        assert ds.pixel_array.shape == (np_nifti.shape[0], np_nifti.shape[1])
+
+        # UPDATE CHANGE RESCALESLOPE
+        if doUpdateRescaleSlope:
+            ds.RescaleSlope = RescaleSlope
+
+        # data_slice = np.flip(np_nifti[:, :, -(i+1)].T, 0).tobytes()
+        data_slice = np.flip(np_nifti[:, :, -(i+1)].T, 0).astype('double')
+        data_slice /= float(RescaleSlope)
+        if np.max(data_slice) > 32767:
+            print("OOOOPS - NEGATIVE VALUES OCCURED!!!")
+            print(np.max(data_slice), ds.RescaleSlope, RescaleSlope)
+        data_slice = data_slice.astype('int16') # To signed short
+        
+        # Insert pixel-data
+        ds.PixelData = data_slice.tostring()
+        ds.LargestImagePixelValue = LargestImagePixelValue
+
+        if modify:
+            # Set information if given
+            if description:
+                ds.SeriesDescription = description
+            if study_id:
+                ds.SeriesNumber = study_id
+            if patient_id:
+                ds.PatientID = patient_id
+            if patient_id:
+                ds.PatientName = patient_id
+
+            # Update SOP - unique per file
+            newSOP = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+            newSOP = '1.3.12.2.1107.5.2.38.51014.' + newSOP + str(i+1)
+            ds.SOPInstanceUID = newSOP
+
+            # Same for all files
+            ds.SeriesInstanceUID = newSIUID
+
+        fname = f"dicom_{ds.InstanceNumber:04}.dcm"
+        ds.save_as(dicomfolder.joinpath(fname))
+        
 
 def rtdose_to_mnc(dcmfile,mncfile):
     
