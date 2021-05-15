@@ -1,5 +1,5 @@
 from nipype.interfaces.fsl import Threshold, IsotropicSmooth, RobustFOV, BET, FLIRT
-from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths
+from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths, UnaryMaths
 from nipype.interfaces.niftyreg import RegResample, RegAladin, RegTransform
 
 
@@ -63,13 +63,13 @@ def inv_affine(inv_aff_input, out_file):
     inverter.run()
 
 
-def iso_resample(in_file, out_file, voxel_size):
+def iso_resample(in_file, out_file, voxel_size=1.0):
     """Resamples an existing volume with the target voxel size
 
     Args:
         in_file (a pathlike object or str): Input file
         out_file (a pathlike object or str): Output file
-        voxel_size (float): target voxel sixe in mm
+        voxel_size (float): target voxel sixe in mm. Default 1.0
     """      
     resampler = FLIRT()
     resampler.inputs.in_file = in_file
@@ -168,7 +168,7 @@ def skull_strip(in_file, out_file, frac, mask=True):
     bet.inputs.out_file = out_file
     bet.run()
     
-def rescale(in_file, operand_value):
+def rescale(in_file, out_file, operand_value):
     """Multiplies the full volume with a numeric value
 
     Args:
@@ -180,6 +180,38 @@ def rescale(in_file, operand_value):
     multiplier.inputs.in_file = in_file
     multiplier.inputs.operation = 'mul'
     multiplier.inputs.operand_value = operand_value
-    multiplier.inputs.out_file = in_file
+    multiplier.inputs.out_file = out_file
+    multiplier.run()
+    
+
+def inv_mask(in_file, out_file):
+    """Multiplies the full volume with a numeric value
+
+    Args:
+        in_file (a pathlike object or str): Image to operate on
+        out_file (a pathlike object or str): Output filename
+    """
+    
+    inverter = UnaryMaths()
+    inverter.inputs.in_file = in_file
+    inverter.inputs.operation = 'binv'
+    inverter.inputs.out_file = out_file
+    inverter.inputs.output_type = "NIFTI_GZ"
+    inverter.run()
+    
+def merge_images(in_file1, in_file2, out_file):
+    """Add two images together in one file
+
+    Args:
+        in_file1 (a pathlike object or str): Input image file 1
+        in_file2 (a pathlike object or str): Input image file 2
+        out_file (a pathlike object or str): Output filename
+    """
+    
+    multiplier = BinaryMaths()
+    multiplier.inputs.in_file = in_file1
+    multiplier.inputs.operation = 'add'
+    multiplier.inputs.operand_file = in_file2
+    multiplier.inputs.out_file = out_file
     multiplier.run()
     
