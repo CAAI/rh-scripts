@@ -504,16 +504,16 @@ def mnc_to_dcm_4D(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,
         print("Output written to %s" % dicomfolder)
 
 
-def nft_to_dcm(nftfile,
-               dicomcontainer,
-               dicomfolder,
-               verbose=False,
-               modify=False,
-               description=None,
-               study_id=None,
-               patient_id=None,
-               checkForFileEndings=True,
-               forceRescaleSlope=False):  
+def nifty_to_dcm(nftfile,
+                 dicomcontainer,
+                 dicomfolder,
+                 verbose=False,
+                 modify=False,
+                 description=None,
+                 study_id=None,
+                 patient_id=None,
+                 checkForFileEndings=True,
+                 forceRescaleSlope=False):  
     """Convert a minc file to dicom
     Parameters
     ----------
@@ -572,8 +572,8 @@ def nft_to_dcm(nftfile,
     
     # Check that the correct number of files exists
     if verbose:
-        print("Checking files ( %d ) equals number of slices ( %d )" % (len(dcm_slices), np_nifti.shape[0]))
-    assert len(dcm_slices) == np_nifti.shape[0]
+        print("Checking files ( %d ) equals number of slices ( %d )" % (len(dcm_slices), np_nifti.shape[2]))
+    assert len(dcm_slices) == np_nifti.shape[2]
     
     LargestImagePixelValue = int(np.ceil(np_nifti.max()))
     
@@ -595,7 +595,7 @@ def nft_to_dcm(nftfile,
             doUpdateRescaleSlope = True
             if verbose:
                 print(f"Setting RescaleSlope from {ds.RescaleSlope} to {RescaleSlope}")
-        elif not ds.RescaleSlope == RescaleSlope:
+        elif ds.RescaleSlope != RescaleSlope:
             if np.max(np_nifti) / ds.RescaleSlope + ds.RescaleIntercept > 32767:
                 old_RescaleSlope = ds.RescaleSlope
                 vol_max = np.max(np_nifti)
@@ -619,7 +619,6 @@ def nft_to_dcm(nftfile,
         if doUpdateRescaleSlope:
             ds.RescaleSlope = RescaleSlope
 
-        # data_slice = np.flip(np_nifti[:, :, -(i+1)].T, 0).tobytes()
         data_slice = np.flip(np_nifti[:, :, -(i+1)].T, 0).astype('double')
         data_slice /= float(RescaleSlope)
         if np.max(data_slice) > 32767:
@@ -627,9 +626,14 @@ def nft_to_dcm(nftfile,
             print(np.max(data_slice), ds.RescaleSlope, RescaleSlope)
         data_slice = data_slice.astype('int16') # To signed short
         
+        # check units
+        if ds.Units != 'BQML':
+            ds.Units = 'BQML'
+
         # Insert pixel-data
         ds.PixelData = data_slice.tostring()
         ds.LargestImagePixelValue = LargestImagePixelValue
+        
 
         if modify:
             # Set information if given
