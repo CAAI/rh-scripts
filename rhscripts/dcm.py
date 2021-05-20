@@ -8,7 +8,6 @@ import configparser
 import glob
 from shutil import copyfile
 import datetime
-from rhscripts.conversion import findExtension
 from pathlib import Path
 from typing import Optional
 
@@ -336,7 +335,7 @@ def send_data(folder, server=None, checkForEndings=True):
         Check if folder contains any files with dicom endings
     
     """
-
+    from rhscripts.conversion import findExtension
     f = findExtension(folder)
     if not checkForEndings or isinstance(f,str):
         

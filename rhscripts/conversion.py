@@ -308,7 +308,7 @@ def to_dcm(np_array,dicomcontainer,dicomfolder,verbose=False,modify=False,descri
     if verbose:
         print("Output written to %s" % dicomfolder)
         
-def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True,forceRescaleSlope=False):  
+def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True,forceRescaleSlope=False,zero_clamp=False):  
     """Convert a minc file to dicom
 
     Parameters
@@ -330,6 +330,8 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
         Sets the SeriesNumber tag in the dicom files
     forceRescaleSlope : boolean, optional
         Forces recalculation of rescale slope
+    zero_clamp : boolean, optional
+        Force the non-zero element in the input to be zero
 
     Examples
     --------
@@ -341,6 +343,10 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
     minc = pyminc.volumeFromFile(mncfile)
     np_minc = np.array(minc.data)
     minc.closeVolume()
+    
+    # Remove non-zero elements
+    if zero_clamp:
+        np_minc[ np_minc < 0 ] = 0.0
     
     to_dcm(np_array=np_minc,
            dicomcontainer=dicomcontainer,

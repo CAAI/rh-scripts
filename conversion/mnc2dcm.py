@@ -2,7 +2,6 @@
 import argparse
 from rhscripts.conversion import mnc_to_dcm
 from rhscripts.version import __show_version__
-import pyminc.volumes.factory as pyminc
 
 __scriptname__ = 'mnc2dcm'
 __version__ = '0.0.4'
@@ -54,6 +53,7 @@ parser.add_argument('--description', help="New name of the DICOM file", nargs=1,
 parser.add_argument('--id', help="New ID of the DICOM file", nargs=1, type=int)
 parser.add_argument("--ignore_check", help="Ignore the check for dicom files in container", action="store_false")
 parser.add_argument("--forceRescaleSlope", help="Force the script to recalculate rescale slope", action="store_true")
+parser.add_argument("--zero_clamp", help="Force non-zero values to zero", action="store_true")
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -69,11 +69,6 @@ if not args.minc_file or not args.dicom_container or not args.dicom_output:
     print('Too few arguments')
     exit(-1)
 
-
-minc = pyminc.volumeFromFile(args.minc_file)
-dinames = minc.dimnames
-minc.closeVolume()
-
 mnc_to_dcm( args.minc_file, 
             args.dicom_container, 
             args.dicom_output, 
@@ -82,4 +77,5 @@ mnc_to_dcm( args.minc_file,
             description=args.description, 
             study_id=args.id, 
             checkForFileEndings=args.ignore_check,
-            forceRescaleSlope=args.forceRescaleSlope)
+            forceRescaleSlope=args.forceRescaleSlope,
+            zero_clamp=args.zero_clamp)
