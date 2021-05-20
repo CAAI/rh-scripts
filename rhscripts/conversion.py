@@ -155,6 +155,7 @@ def to_dcm(np_array,
            modify=False,
            description=None,
            study_id=None,
+           patient_id=None,
            checkForFileEndings=True,
            forceRescaleSlope=False,
            from_type='minc'):  
@@ -197,8 +198,7 @@ def to_dcm(np_array,
     if checkForFileEndings:
         dcmcontainer = look_for_dcm_files(dicomcontainer)
         if dcmcontainer == -1:
-            print("Could not find dicom files in container..")
-            exit(-1)
+            sys.exit("Could not find dicom files in container..")
     else:
         dcmcontainer = dicomcontainer
         
@@ -219,10 +219,14 @@ def to_dcm(np_array,
             print("Converting a 4D array")
     
     # Check that the correct number of files exists
-    if from_type == 'minc' and is_4D: totalSlicesInArray = np_array.shape[0]*np_array.shape[1]
-    if from_type == 'minc' and not is_4D: totalSlicesInArray = np_array.shape[0]
-    if from_type == 'nifty' and is_4D: sys.exit('Nifty 4D conversion not yet implemented')
-    if from_type == 'nifty' and not is_4D: totalSlicesInArray = np_array.shape[2]
+    if from_type == 'minc' and is_4D: 
+        totalSlicesInArray = np_array.shape[0]*np_array.shape[1]
+    if from_type == 'minc' and not is_4D: 
+        totalSlicesInArray = np_array.shape[0]
+    if from_type == 'nifty' and is_4D: 
+        sys.exit('Nifty 4D conversion not yet implemented')
+    if from_type == 'nifty' and not is_4D: 
+        totalSlicesInArray = np_array.shape[2]
         
     if verbose:
         print("The number of files ( {} ) equals number of slices ( {} )" % (len(dcm_slices), np_array.shape[2]))
@@ -298,10 +302,13 @@ def to_dcm(np_array,
                 print("Modifying DICOM headers")
 
             # Set information if given
-            if not description == None:
+            if description:
                 ds.SeriesDescription = description
-            if not study_id == None:
+            if study_id:
                 ds.SeriesNumber = study_id
+            if patient_id:
+                ds.PatientID = patient_id
+                ds.PatientName = patient_id
 
             # Update SOP - unique per file
             ds.SOPInstanceUID = generate_SOPInstanceUID(i+1)
@@ -318,7 +325,16 @@ def to_dcm(np_array,
     if verbose:
         print("Output written to %s" % dicomfolder)
         
-def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True,forceRescaleSlope=False,zero_clamp=False):  
+def mnc_to_dcm(mncfile,
+               dicomcontainer,
+               dicomfolder,
+               verbose=False,
+               modify=False,
+               description=None,
+               study_id=None,
+               checkForFileEndings=True,
+               forceRescaleSlope=False,
+               zero_clamp=False):  
     """Convert a minc file to dicom
 
     Parameters
@@ -417,13 +433,7 @@ def nifty_to_dcm(nftfile,
     >>> nifty_to_dcm('PETCT_new.nii.gz', 'PETCT', 'PETCT_new', description="PETCT_new", id="600")
     """
     
-    # Load the nifti file
-    if verbose:
-        print("Converting to DICOM")
-
-    if description or study_id:
-        modify = True
-    
+    ## NEED TO REUSE THIS PART OF CODE FROM to_dcm TO GET ds.pixel_array.dtype   
     if checkForFileEndings:
         dcmcontainer = look_for_dcm_files(dicomcontainer)
         if dcmcontainer == -1:
@@ -450,10 +460,12 @@ def nifty_to_dcm(nftfile,
            modify=modify,
            description=description,
            study_id=study_id,
+           patient_id=patient_id,
            checkForFileEndings=checkForFileEndings,
            forceRescaleSlope=forceRescaleSlope,
            from_type='nifty')
         
+
 def rtdose_to_mnc(dcmfile,mncfile):
     
     """Convert dcm file (RD dose distribution) to minc file
@@ -503,7 +515,14 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol.closeVolume() 
 
 
-def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,dry_run=False,roi_name=None,crop_area=False):
+def rtx_to_mnc(dcmfile,
+               mnc_container_file,
+               mnc_output_file,
+               verbose=False,
+               copy_name=False,
+               dry_run=False,
+               roi_name=None,
+               crop_area=False):
     
     """Convert dcm file (RT struct) to minc file
 
@@ -605,7 +624,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
             volume.closeVolume()
 
     except InvalidDicomError:
-        print("Could not read DICOM RTX file",args.RTX)
+        print("Could not read DICOM RTX file", dcmfile)
         exit(-1)
 
 
