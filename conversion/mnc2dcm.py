@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import argparse
-from rhscripts.conversion import mnc_to_dcm, mnc_to_dcm_4D
+from rhscripts.conversion import mnc_to_dcm
 from rhscripts.version import __show_version__
 import pyminc.volumes.factory as pyminc
 
 __scriptname__ = 'mnc2dcm'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 """
 
@@ -13,6 +13,7 @@ VERSIONING
   0.0.1 # Created script
   0.0.2 # Added option to ignore the check for dicom files
   0.0.3 # Added rescale slope and intercept for PET files
+  0.0.4 # Removed the call to mnc_to_dcm_4D since this is now part of mnc_to_dcm
 
 """
 
@@ -73,18 +74,7 @@ minc = pyminc.volumeFromFile(args.minc_file)
 dinames = minc.dimnames
 minc.closeVolume()
 
-if 'time' in minc.dimnames:
-	mnc_to_dcm_4D( args.minc_file, 
-            args.dicom_container, 
-            args.dicom_output, 
-            verbose=args.verbose, 
-            modify=args.modify, 
-            description=args.description, 
-            study_id=args.id, 
-            checkForFileEndings=args.ignore_check,
-            forceRescaleSlope=args.forceRescaleSlope)
-else:
-	mnc_to_dcm( args.minc_file, 
+mnc_to_dcm( args.minc_file, 
             args.dicom_container, 
             args.dicom_output, 
             verbose=args.verbose, 
