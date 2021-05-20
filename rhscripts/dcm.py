@@ -13,10 +13,7 @@ from typing import Optional
 
 def __generate_uid_suffix() -> str:
     """ Generate and return a new UID """
-    UID = str(datetime.datetime.now())
-    for symbol in ['-',' ',':','.']:
-        UID = UID.replace(symbol,'')
-    return UID
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 def generate_StudyInstanceUID() -> str:
     """ Generate and return a new StudyInstanceUID """
