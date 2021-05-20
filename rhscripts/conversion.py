@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import sys
 import os, glob
 try:
     import pydicom as dicom
@@ -13,7 +13,7 @@ from nipype.interfaces.dcm2nii import Dcm2niix
 import nibabel as nib
 from pathlib import Path
 import numpy as np
-import datetime, time, warnings
+import time, warnings
 import cv2
 from rhscripts.dcm import generate_SeriesInstanceUID, generate_SOPInstanceUID
 
@@ -146,9 +146,19 @@ def dcm_to_nifty(source_dir, output_dir, out_filename, compress='y'):
         converter.run()
     except Exception as e:
         print(e)
-        
-def to_dcm(np_array,dicomcontainer,dicomfolder,verbose=False,modify=False,description=None,study_id=None,checkForFileEndings=True,forceRescaleSlope=False,from_type='minc'):  
-    """Convert a minc file to dicom
+
+
+def to_dcm(np_array,
+           dicomcontainer,
+           dicomfolder,
+           verbose=False,
+           modify=False,
+           description=None,
+           study_id=None,
+           checkForFileEndings=True,
+           forceRescaleSlope=False,
+           from_type='minc'):  
+    """Convert a numpy array (initially loaded from minc or nifty file) to dicom
 
     Parameters
     ----------
@@ -358,14 +368,16 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
            checkForFileEndings=checkForFileEndings,
            forceRescaleSlope=forceRescaleSlope,
            from_type='minc')
-    
+
+
 """ DEPRECATED FUNCTION. """
 def mnc_to_dcm_4D(*args, **kwargs):  
     warnings.warn("mnc_to_dcm_4D has been replaced by mnc_to_dcm which incorporates the full functionality.",
                   DeprecationWarning)
     time.sleep(5)
     return mnc_to_dcm(*args, **kwargs)
-    
+
+
 def nifty_to_dcm(nftfile,
                  dicomcontainer,
                  dicomfolder,
@@ -406,6 +418,29 @@ def nifty_to_dcm(nftfile,
     """
     
     # Load the nifti file
+    if verbose:
+        print("Converting to DICOM")
+
+    if description or study_id:
+        modify = True
+    
+    if checkForFileEndings:
+        dcmcontainer = look_for_dcm_files(dicomcontainer)
+        if dcmcontainer == -1:
+            print("Could not find dicom files in container..")
+            exit(-1)
+    else:
+        dcmcontainer = dicomcontainer
+        
+    # change path str to path object
+    if isinstance(dcmcontainer, str):
+        dcmcontainer = Path(dcmcontainer) 
+        
+    # gather the dicom slices from the container
+    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
+
+    # Get information about the dataset from a single file
+    ds = dcmread(dcm_slices[0])
     np_nifti = nib.load(nftfile).get_fdata().astype(ds.pixel_array.dtype)
     
     to_dcm(np_array=np_nifti,
@@ -466,6 +501,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol = pyminc.volumeFromData(mncfile,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
     out_vol.writeFile() 
     out_vol.closeVolume() 
+
 
 def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_name=False,dry_run=False,roi_name=None,crop_area=False):
     
@@ -571,6 +607,7 @@ def rtx_to_mnc(dcmfile,mnc_container_file,mnc_output_file,verbose=False,copy_nam
     except InvalidDicomError:
         print("Could not read DICOM RTX file",args.RTX)
         exit(-1)
+
 
 def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
 
