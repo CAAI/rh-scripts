@@ -28,5 +28,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        pytest tests/unit/test_utils.py
-        pytest tests/unit/test_dcm.py
+        pytest tests/unit
