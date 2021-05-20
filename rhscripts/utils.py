@@ -245,7 +245,7 @@ def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image
     
     predicted_clusters = measure.label( predicted_image, background=0 )
     true_clusters = measure.label( reference_image, background=0 )
-    overlap = np.multiply(true_clusters, resultImage) 
+    overlap = np.multiply(true_clusters, predicted_image) 
     
     numTrueClusters = np.max(true_clusters)
     numPredClusters = np.max(predicted_clusters)

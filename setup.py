@@ -32,7 +32,8 @@ setup(
          'pydicom',
          'opencv-python',
          'matplotlib',
-         'pandas'
+         'pandas',
+         'scikit-image'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',
