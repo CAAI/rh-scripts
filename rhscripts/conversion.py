@@ -13,9 +13,8 @@ from nipype.interfaces.dcm2nii import Dcm2niix
 import nibabel as nib
 from pathlib import Path
 import numpy as np
-import datetime
+import datetime, time, warnings
 import cv2
-from rhscripts.utils import listdir_nohidden, bbox_ND
 from rhscripts.dcm import generate_SeriesInstanceUID, generate_SOPInstanceUID
 
 
@@ -354,10 +353,11 @@ def mnc_to_dcm(mncfile,dicomcontainer,dicomfolder,verbose=False,modify=False,des
            forceRescaleSlope=forceRescaleSlope,
            from_type='minc')
     
-""" LEGACY FUNCTION. """
+""" DEPRECATED FUNCTION. """
 def mnc_to_dcm_4D(*args, **kwargs):  
-    from warnings import warn
-    warn("mnc_to_dcm_4D has been replaced by mnc_to_dcm which incorporates the full functionality.")
+    warnings.warn("mnc_to_dcm_4D has been replaced by mnc_to_dcm which incorporates the full functionality.",
+                  DeprecationWarning)
+    time.sleep(5)
     return mnc_to_dcm(*args, **kwargs)
     
 def nifty_to_dcm(nftfile,
