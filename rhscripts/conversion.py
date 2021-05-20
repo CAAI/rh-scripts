@@ -7,7 +7,6 @@ try:
 except ImportError:
     import dicom
     from dicom.filereader import InvalidDicomError #For rtx2mnc
-import pyminc.volumes.factory as pyminc
 from pydicom import dcmread
 from nipype.interfaces.dcm2nii import Dcm2niix
 import nibabel as nib
@@ -366,6 +365,7 @@ def mnc_to_dcm(mncfile,
     """
     
     # Load the minc file
+    import pyminc.volumes.factory as pyminc
     minc = pyminc.volumeFromFile(mncfile)
     np_minc = np.array(minc.data)
     minc.closeVolume()
@@ -510,6 +510,7 @@ def rtdose_to_mnc(dcmfile,mncfile):
     dose_array = ds.pixel_array*float(ds.DoseGridScaling)
     
     # Write the output minc file
+    import pyminc.volumes.factory as pyminc
     out_vol = pyminc.volumeFromData(mncfile,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
     out_vol.writeFile() 
     out_vol.closeVolume() 
@@ -551,6 +552,7 @@ def rtx_to_mnc(dcmfile,
     """
 
     try:
+        import pyminc.volumes.factory as pyminc
         RTSS = dicom.read_file(dcmfile) 
             
         ROIs = RTSS.ROIContourSequence
