@@ -6,6 +6,8 @@ import numpy as np
 import sys, random, typing, time, pydicom
 from pathlib import Path
 import pandas as pd
+from skimage import measure
+import collections
 
 def listdir_nohidden(path):
     """List dir without hidden files
@@ -238,3 +240,22 @@ class LMParser:
         if self.verbose: 
             print( message )
     
+def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image: np.ndarray ) -> collections.namedtuple:    
+    """ Lesion-level detection metrics """
+    
+    predicted_clusters = measure.label( predicted_image, background=0 )
+    true_clusters = measure.label( reference_image, background=0 )
+    overlap = np.multiply(true_clusters, resultImage) 
+    
+    numTrueClusters = np.max(true_clusters)
+    numPredClusters = np.max(predicted_clusters)
+    
+    TP = len(np.unique(overlap)) - 1 # 1 for BG
+    FP = numPredClusters - TP
+    
+    recall = 0 if numTrueClusters == 0 else TP / numTrueClusters
+    precision = 0 if numPredClusters == 0  else TP  / numPredClusters
+    f1 = any([precision,recall]) and 2*(precision*recall)/(precision+recall) or 0
+    
+    Metrics = collections.namedtuple("Metrics", ["precision", "recall", "f1", "TP", "FP"])
+    return Metrics(precision=precision, recall=recall, f1=f1, TP=TP, FP=FP)
