@@ -33,7 +33,8 @@ setup(
          'opencv-python',
          'matplotlib',
          'pandas',
-         'nipype'
+         'nipype',
+         'scikit-image'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',
