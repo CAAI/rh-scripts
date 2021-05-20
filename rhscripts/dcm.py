@@ -12,6 +12,31 @@ from rhscripts.conversion import findExtension
 from pathlib import Path
 from typing import Optional
 
+def __generate_uid_suffix() -> str:
+    """ Generate and return a new UID """
+    UID = str(datetime.datetime.now())
+    for symbol in ['-',' ',':','.']:
+        UID = UID.replace(symbol,'')
+    return UID
+
+def generate_StudyInstanceUID() -> str:
+    """ Generate and return a new StudyInstanceUID """
+    return '1.3.51.0.1.1.10.143.20.159.{}.7754590'.format(__generate_uid_suffix())
+    
+def generate_SeriesInstanceUID() -> str:
+    """ Generate and return a new SeriesInstanceUID """
+    return '1.3.12.2.1107.5.2.38.51014.{}11111.0.0.0'.format(__generate_uid_suffix())
+
+def generate_SOPInstanceUID(i: int) -> str:
+    """ Generate and return a new SOPInstanceUID
+    
+    Parameters
+    ----------
+    i : int
+        Running number, typically InstanceNumber of the slice
+    """
+    return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(__generate_uid_suffix(),i)
+
 class Anonymize:
     """
     Anonymize script for DICOM file or folder containing dicom files
@@ -36,31 +61,6 @@ class Anonymize:
         self.verbose = verbose
         self.remove_private_tags = remove_private_tags
         self.sort_by_instance_number = sort_by_instance_number
-    
-    def __generate_uid(self) -> str:
-        """ Generate and return a new UID """
-        UID = str(datetime.datetime.now())
-        for symbol in ['-',' ',':','.']:
-            UID = UID.replace(symbol,'')
-        return UID
-    
-    def generate_StudyInstanceUID(self) -> str:
-        """ Generate and return a new StudyInstanceUID """
-        return '1.3.51.0.1.1.10.143.20.159.{}.7754590'.format(self.__generate_uid())
-    
-    def generate_SeriesInstanceUID(self) -> str:
-        """ Generate and return a new SeriesInstanceUID """
-        return '1.3.12.2.1107.5.2.38.51014.{}11111.0.0.0'.format(self.__generate_uid())
-    
-    def generate_SOPInstanceUID(self,i: int) -> str:
-        """ Generate and return a new SOPInstanceUID
-        
-        Parameters
-        ----------
-        i : int
-            Running number, typically InstanceNumber of the slice
-        """
-        return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(self.__generate_uid(),i)
     
     def anonymize_dataset(self, dataset: dicom.dataset.Dataset, new_person_name: str="anonymous", 
                   studyInstanceUID: str=None, seriesInstanceUID: str=None, replaceUIDs: bool=False) -> dicom.dataset.Dataset:
@@ -121,9 +121,9 @@ class Anonymize:
             
         # Replace InstanceUIDs
         if replaceUIDs:
-            dataset.StudyInstanceUID = studyInstanceUID if studyInstanceUID is not None else self.generate_StudyInstanceUID()
-            dataset.SeriesInstanceUID = seriesInstanceUID if seriesInstanceUID is not None else self.generate_SeriesInstanceUID()
-            dataset.SOPInstanceUID = self.generate_SOPInstanceUID(dataset.InstanceNumber)
+            dataset.StudyInstanceUID = studyInstanceUID if studyInstanceUID is not None else generate_StudyInstanceUID()
+            dataset.SeriesInstanceUID = seriesInstanceUID if seriesInstanceUID is not None else generate_SeriesInstanceUID()
+            dataset.SOPInstanceUID = generate_SOPInstanceUID(dataset.InstanceNumber)
     
         return dataset
         
@@ -197,8 +197,9 @@ class Anonymize:
             
         # Check for replaceUIDs:
         if replaceUIDs:
-            if studyInstanceUID is None: studyInstanceUID = self.generate_StudyInstanceUID()
-            seriesInstanceUID = self.generate_SeriesInstanceUID()
+            if studyInstanceUID is None: 
+            	studyInstanceUID = generate_StudyInstanceUID()
+            seriesInstanceUID = generate_SeriesInstanceUID()
     
         for fid,filename in enumerate(os.listdir(foldername)):
             ending = '.dcm' if os.path.splitext(filename)[1]=='' else os.path.splitext(filename)[1]
@@ -372,31 +373,6 @@ def send_data(folder, server=None, checkForEndings=True):
                 folder)
         
         os.system(cmd)
-        
-def generate_uid_suffix() -> str:
-    """ Generate and return a new UID """
-    UID = str(datetime.datetime.now())
-    for symbol in ['-',' ',':','.']:
-        UID = UID.replace(symbol,'')
-    return UID
-
-def generate_StudyInstanceUID() -> str:
-    """ Generate and return a new StudyInstanceUID """
-    return '1.3.51.0.1.1.10.143.20.159.{}.7754590'.format(generate_uid_suffix())
-    
-def generate_SeriesInstanceUID() -> str:
-    """ Generate and return a new SeriesInstanceUID """
-    return '1.3.12.2.1107.5.2.38.51014.{}11111.0.0.0'.format(generate_uid_suffix())
-
-def generate_SOPInstanceUID(i: int) -> str:
-    """ Generate and return a new SOPInstanceUID
-    
-    Parameters
-    ----------
-    i : int
-        Running number, typically InstanceNumber of the slice
-    """
-    return '1.3.12.2.1107.5.2.38.51014.{}{}'.format(generate_uid_suffix(),i)
         
 def replace_container(in_folder: str, container: str, out_folder: str, SeriesNumber: int=None, SeriesDescription: str=None):
     """
