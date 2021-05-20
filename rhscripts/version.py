@@ -1,4 +1,4 @@
-__version__ = '0.1.6'
+__version__ = '0.1.7'
 git_revision = ''
 
 """
@@ -23,6 +23,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.1.4 # Added anonymize function to LMParser
   0.1.5 # LMParser can return number of prompt/delayed events over time
   0.1.6 # Added replace_dicom_container function
+  0.1.7 # Added nifty_to_dcm. Function merged with mnc_to_dcm* into to_dcm
 """
 
 def __show_version__():

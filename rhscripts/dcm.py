@@ -8,16 +8,12 @@ import configparser
 import glob
 from shutil import copyfile
 import datetime
-from rhscripts.conversion import findExtension
 from pathlib import Path
 from typing import Optional
 
 def __generate_uid_suffix() -> str:
     """ Generate and return a new UID """
-    UID = str(datetime.datetime.now())
-    for symbol in ['-',' ',':','.']:
-        UID = UID.replace(symbol,'')
-    return UID
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 def generate_StudyInstanceUID() -> str:
     """ Generate and return a new StudyInstanceUID """
@@ -336,7 +332,7 @@ def send_data(folder, server=None, checkForEndings=True):
         Check if folder contains any files with dicom endings
     
     """
-
+    from rhscripts.conversion import findExtension
     f = findExtension(folder)
     if not checkForEndings or isinstance(f,str):
         

@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 import argparse
-from rhscripts.conversion import mnc_to_dcm, mnc_to_dcm_4D
+from rhscripts.conversion import mnc_to_dcm
 from rhscripts.version import __show_version__
-import pyminc.volumes.factory as pyminc
 
 __scriptname__ = 'mnc2dcm'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 """
 
@@ -13,6 +12,7 @@ VERSIONING
   0.0.1 # Created script
   0.0.2 # Added option to ignore the check for dicom files
   0.0.3 # Added rescale slope and intercept for PET files
+  0.0.4 # Removed the call to mnc_to_dcm_4D since this is now part of mnc_to_dcm
 
 """
 
@@ -53,6 +53,7 @@ parser.add_argument('--description', help="New name of the DICOM file", nargs=1,
 parser.add_argument('--id', help="New ID of the DICOM file", nargs=1, type=int)
 parser.add_argument("--ignore_check", help="Ignore the check for dicom files in container", action="store_false")
 parser.add_argument("--forceRescaleSlope", help="Force the script to recalculate rescale slope", action="store_true")
+parser.add_argument("--zero_clamp", help="Force non-zero values to zero", action="store_true")
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -68,13 +69,7 @@ if not args.minc_file or not args.dicom_container or not args.dicom_output:
     print('Too few arguments')
     exit(-1)
 
-
-minc = pyminc.volumeFromFile(args.minc_file)
-dinames = minc.dimnames
-minc.closeVolume()
-
-if 'time' in minc.dimnames:
-	mnc_to_dcm_4D( args.minc_file, 
+mnc_to_dcm( args.minc_file, 
             args.dicom_container, 
             args.dicom_output, 
             verbose=args.verbose, 
@@ -82,14 +77,5 @@ if 'time' in minc.dimnames:
             description=args.description, 
             study_id=args.id, 
             checkForFileEndings=args.ignore_check,
-            forceRescaleSlope=args.forceRescaleSlope)
-else:
-	mnc_to_dcm( args.minc_file, 
-            args.dicom_container, 
-            args.dicom_output, 
-            verbose=args.verbose, 
-            modify=args.modify, 
-            description=args.description, 
-            study_id=args.id, 
-            checkForFileEndings=args.ignore_check,
-            forceRescaleSlope=args.forceRescaleSlope)
+            forceRescaleSlope=args.forceRescaleSlope,
+            zero_clamp=args.zero_clamp)
