@@ -146,12 +146,12 @@ class Anonymize:
             assert seriesInstanceUID is not None # Must be set on folder level
             
         # Anonymize
-        ds = anonymize_dataset( dataset=ds, new_person_name=new_person_name, studyInstanceUID=studyInstanceUID,
+        ds = self.anonymize_dataset( dataset=ds, new_person_name=new_person_name, studyInstanceUID=studyInstanceUID,
                                 seriesInstanceUID=seriesInstanceUID, replaceUIDs=replaceUIDs )
         
         # Overwrite filename
         if self.sort_by_instance_number:
-            output_filename = "dicom"+str(dataset.InstanceNumber).zfill(4)+'.dcm'
+            output_filename = "dicom"+str(ds.InstanceNumber).zfill(4)+'.dcm'
             
         # write the 'anonymized' DICOM out under the new filename
         ds.save_as(output_filename) 
@@ -427,6 +427,8 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
     # Create output folder   
     Path(out_folder).mkdir(exist_ok=True,parents=True)
     
+    seriesInstanceUID = generate_SeriesInstanceUID()
+    
     # For each slice, 1-indexed due to InstanceNumber key
     for i in range(1,len(d_new)+1):
         
@@ -435,7 +437,7 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
         
         ds_container.PixelData = ds_new.PixelData
         
-        ds_container.SeriesInstanceUID = generate_SeriesInstanceUID()
+        ds_container.SeriesInstanceUID = seriesInstanceUID
         ds_container.SOPInstanceUID = generate_SOPInstanceUID( i )
         
         if SeriesDescription is not None: ds_container.SeriesDescription = SeriesDescription
