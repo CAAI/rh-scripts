@@ -143,7 +143,7 @@ class Anonymize:
             
         # Anonymize
         ds = self.anonymize_dataset( dataset=ds, new_person_name=new_person_name, studyInstanceUID=studyInstanceUID,
-                                seriesInstanceUID=seriesInstanceUID, replaceUIDs=replaceUIDs )
+                                     seriesInstanceUID=seriesInstanceUID, replaceUIDs=replaceUIDs )
         
         # Overwrite filename
         if self.sort_by_instance_number:
