@@ -7,7 +7,7 @@ Created on Thu May 20 12:47:55 2021
 """
 
 import unittest
-from rhscripts.utils import getLesionLevelDetectionMetrics
+from rhscripts.metrics import getLesionLevelDetectionMetrics
 import numpy as np
 
 # Helper functions
