@@ -228,8 +228,8 @@ def to_dcm(np_array,
         totalSlicesInArray = np_array.shape[2]
         
     if verbose:
-        print("The number of files ( {} ) equals number of slices ( {} )" % (len(dcm_slices), np_array.shape[2]))
-    assert len(dcm_slices) == np_array.shape[2]
+        print("The number of files ( {} ) equals number of slices ( {} )" % (len(dcm_slices), totalSlicesInArray))
+    assert len(dcm_slices) == totalSlicesInArray
 
     ## Prepare for MODIFY HEADER
     newSIUID = generate_SeriesInstanceUID()
