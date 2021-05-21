@@ -8,7 +8,7 @@ Created on Fri May 21 12:47:52 2021
 
 from skimage import measure
 import collections
-import numpy as nb
+import numpy as np
 
 def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image: np.ndarray ) -> collections.namedtuple:    
     """
