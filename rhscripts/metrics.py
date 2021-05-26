@@ -45,3 +45,53 @@ def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image
     
     Metrics = collections.namedtuple("Metrics", ["precision", "recall", "f1", "TP", "FP"])
     return Metrics(precision=precision, recall=recall, f1=f1, TP=TP, FP=FP)
+
+def getLesionLevelDetectionMetricsV2( reference_image: np.ndarray, predicted_image: np.ndarray ) -> collections.namedtuple:    
+    """
+    
+    Lesion-level detection metrics
+    
+    V2 runs through all predicted lesions first, and counts the TP and FP. 
+    Then all ref-lesions are examined for FN. Compared to V1, this ensures 
+    that FP >= 0 and sensitivity<=1.
+
+    Parameters
+    ----------
+    reference_image : np.ndarray
+        Reference image of zeros (background) and ROIs (above zero).
+    predicted_image : np.ndarray
+        New image of zeros (background) and ROIs (above zero).
+
+    Returns
+    -------
+    metrics
+        Named tuple of metrics. Get e.g. TP by calling metrics.TP.
+
+    """
+    
+    predicted_clusters = measure.label( predicted_image, background=0 )
+    true_clusters = measure.label( reference_image, background=0 )
+    
+    TP,FP,FN = 0,0,0
+    for ind in range(predicted_clusters.max()):
+        lp = np.zeros(reference_image.shape)
+        lp[ predicted_clusters == ind+1 ] = 1.0
+        if np.sum( lp * reference_image ) > 0:
+            TP+=1
+        else:
+            FP+=1
+    for ind in range(true_clusters.max()):
+        lr = np.zeros(reference_image.shape)
+        lr[ true_clusters == ind+1 ] = 1.0
+        if np.sum( lr * predicted_image ) == 0:
+            FN+=1
+    
+    P = FN+TP
+    numPredClusters = TP+FP
+    
+    recall = 0 if P == 0 else TP / P
+    precision = 0 if numPredClusters == 0  else TP  / numPredClusters
+    f1 = any([precision,recall]) and 2*(precision*recall)/(precision+recall) or 0
+    
+    Metrics = collections.namedtuple("Metrics", ["precision", "recall", "f1", "TP", "FP", "FN"])
+    return Metrics(precision=precision, recall=recall, f1=f1, TP=TP, FP=FP, FN=FN)
