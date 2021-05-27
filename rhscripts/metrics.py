@@ -11,7 +11,7 @@ import collections
 import numpy as np
 from scipy.spatial import distance
 
-def get_dice(arr1: np.ndarray, arr2: np.ndarray) -> float:
+def dice_similarity(arr1: np.ndarray, arr2: np.ndarray) -> float:
     """
     Dice-score from two numpy arrays
     """
