@@ -9,6 +9,13 @@ Created on Fri May 21 12:47:52 2021
 from skimage import measure
 import collections
 import numpy as np
+from scipy.spatial import distance
+
+def get_dice(arr1: np.ndarray, arr2: np.ndarray) -> float:
+    """
+    Dice-score from two numpy arrays
+    """
+    return 1. - distance.dice( arr1.flatten(), arr2.flatten() )
 
 def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image: np.ndarray ) -> collections.namedtuple:    
     """
