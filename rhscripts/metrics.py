@@ -51,9 +51,9 @@ def getLesionLevelDetectionMetricsV2( reference_image: np.ndarray, predicted_ima
     
     Lesion-level detection metrics
     
-    V2 runs through all predicted lesions first, and counts the TP and FP. 
-    Then all ref-lesions are examined for FN. Compared to V1, this ensures 
-    that FP >= 0 and sensitivity<=1.
+    Will count TP as predicted lesions that are part of reference rather than 
+    reference lesions part of prediction (V1 behavior).
+    Compared to V1, this ensures that FP >= 0 and sensitivity<=1.
 
     Parameters
     ----------
@@ -72,19 +72,12 @@ def getLesionLevelDetectionMetricsV2( reference_image: np.ndarray, predicted_ima
     predicted_clusters = measure.label( predicted_image, background=0 )
     true_clusters = measure.label( reference_image, background=0 )
     
-    TP,FP,FN = 0,0,0
-    for ind in range(predicted_clusters.max()):
-        lp = np.zeros(reference_image.shape)
-        lp[ predicted_clusters == ind+1 ] = 1.0
-        if np.sum( lp * reference_image ) > 0:
-            TP+=1
-        else:
-            FP+=1
-    for ind in range(true_clusters.max()):
-        lr = np.zeros(reference_image.shape)
-        lr[ true_clusters == ind+1 ] = 1.0
-        if np.sum( lr * predicted_image ) == 0:
-            FN+=1
+    predicted_overlap = np.multiply(predicted_clusters, reference_image)
+    TP = len(np.unique(predicted_overlap))-1 # BG
+    FP = np.max(predicted_clusters)-TP
+    
+    reference_overlap = np.multiply(true_clusters, predicted_image)
+    FN = np.max(true_clusters) - (len(np.unique(reference_overlap))-1)
     
     P = FN+TP
     numPredClusters = TP+FP
