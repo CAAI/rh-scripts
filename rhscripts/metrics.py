@@ -44,14 +44,15 @@ def getLesionLevelDetectionMetrics( reference_image: np.ndarray, predicted_image
     numPredClusters = np.max(predicted_clusters)
     
     TP = len(np.unique(overlap)) - 1 # 1 for BG
-    FP = numPredClusters - TP
+    FN = numTrueClusters-TP
+    FP = numPredClusters - (len(np.unique((overlap>0).astype(int) * predicted_clusters))-1)
     
     recall = 0 if numTrueClusters == 0 else TP / numTrueClusters
-    precision = 0 if numPredClusters == 0  else TP  / numPredClusters
+    precision = 0 if numPredClusters == 0  else TP  / (TP+FP)
     f1 = any([precision,recall]) and 2*(precision*recall)/(precision+recall) or 0
     
-    Metrics = collections.namedtuple("Metrics", ["precision", "recall", "f1", "TP", "FP"])
-    return Metrics(precision=precision, recall=recall, f1=f1, TP=TP, FP=FP)
+    Metrics = collections.namedtuple("Metrics", ["precision", "recall", "f1", "TP", "FP", "FN"])
+    return Metrics(precision=precision, recall=recall, f1=f1, TP=TP, FP=FP, FN=FN)
 
 def getLesionLevelDetectionMetricsV2( reference_image: np.ndarray, predicted_image: np.ndarray ) -> collections.namedtuple:    
     """
