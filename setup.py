@@ -5,9 +5,9 @@ from rhscripts.version import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-    
+
 setup(
-     name='rhscripts',  
+     name='rhscripts',
      version=__version__,
      author="Claes Ladefoged",
      author_email="claes.noehr.ladefoged@regionh.dk",
@@ -21,6 +21,7 @@ setup(
              'conversion/dicom_to_minc.py',
   	    	 'conversion/rtx2mnc.py',
   	    	 'conversion/mnc2dcm.py',
+             'conversion/nii2dcm.py',
   	    	 'conversion/rtdose2mnc.py',
   	    	 'conversion/hu2lac.py',
           	 'conversion/lac2hu.py',
