@@ -1,4 +1,4 @@
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 git_revision = ''
 
 """
@@ -16,7 +16,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.0.10 # Added dry_run, roi_name, and crop_area functionality to conversion.rtx2mnc
   0.0.11 # mnc2dcm fixed with PET values above LargestPixelValue 32767
   0.0.12 # mnc2dcm4D fixed with PET values above LargestPixelValue 32767
-  0.1.0 # Added hu2lac and lac2hu 
+  0.1.0 # Added hu2lac and lac2hu
   0.1.1 # Merging develop_claes with mnc2dcm functionality updates handle PET images
   0.1.2 # Added LMParser that can read and parse LLM files
   0.1.3 # Added DICOM anonymize functionality
@@ -24,6 +24,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.1.5 # LMParser can return number of prompt/delayed events over time
   0.1.6 # Added replace_dicom_container function
   0.1.7 # Added nifty_to_dcm. Function merged with mnc_to_dcm* into to_dcm
+  0.1.8 # Fixed RescaleSlope and RescaleIntercept, incl moving them in pr slice rather than global
 """
 
 def __show_version__():

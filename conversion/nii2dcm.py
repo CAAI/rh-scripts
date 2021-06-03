@@ -50,6 +50,8 @@ parser.add_argument('--description', help="New name of the DICOM file", nargs=1,
 parser.add_argument('--id', help="New ID of the DICOM file", nargs=1, type=int)
 parser.add_argument("--ignore_check", help="Ignore the check for dicom files in container", action="store_false")
 parser.add_argument("--forceRescaleSlope", help="Force the script to recalculate rescale slope", action="store_true")
+parser.add_argument('--clamp_lower', help="Lower limit to be applied to file before converting", nargs=1, type=int)
+parser.add_argument('--clamp_upper', help="Upper limit to be applied to file before converting", nargs=1, type=int)
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -73,4 +75,6 @@ nifty_to_dcm( args.nifty_file,
             description=args.description,
             study_id=args.id,
             checkForFileEndings=args.ignore_check,
-            forceRescaleSlope=args.forceRescaleSlope)
+            forceRescaleSlope=args.forceRescaleSlope,
+            clamp_lower=args.clamp_lower,
+            clamp_upper=args.clamp_upper)

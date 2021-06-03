@@ -189,7 +189,8 @@ def to_dcm(np_array,
     """
 
     # CONSTANT(S)
-    SIGNED_FLOAT_MAXIMUM = 32767
+    _CONSTANTS = {'int16': 32767,
+                  'uint16': 65535}
 
     if verbose:
         print("Converting to DICOM")
@@ -213,6 +214,7 @@ def to_dcm(np_array,
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
+    data_type = ds.pixel_array.dtype.name
 
     # Determine if this is a 4D array
     if is_4D := ( hasattr(ds, 'NumberOfSlices') and len(np_array.shape) == 4 ):
@@ -236,45 +238,18 @@ def to_dcm(np_array,
 
     ## Prepare for MODIFY HEADER
     newSIUID = generate_SeriesInstanceUID()
-    LargestImagePixelValue = int(np.ceil(np_array.max()))
 
     # Prepare output folder
     if isinstance(dicomfolder, str):
         dicomfolder = Path(dicomfolder)
     dicomfolder.mkdir(parents=True, exist_ok=True)
 
-    # Calculate new rescale slope if not 1
-    RescaleSlope = 1.0
-    doUpdateRescaleSlope = False
-    if hasattr(ds, 'RescaleSlope'):
-        if forceRescaleSlope:
-            RescaleSlope = np.max(np_array) / float(SIGNED_FLOAT_MAXIMUM) + 0.000000000001
-            doUpdateRescaleSlope = True
-            if verbose:
-                print(f"Setting RescaleSlope from {ds.RescaleSlope} to {RescaleSlope}")
-        elif not ds.RescaleSlope == RescaleSlope:
-            # OBS: the SIGNED_FLOAT_MAXIMUM might not fit all dicom datasets (e.g. unsigned short is 2xSIGNED_FLOAT_MAXIMUM..)
-            if np.max(np_array)/ds.RescaleSlope+ds.RescaleIntercept > SIGNED_FLOAT_MAXIMUM:
-                old_RescaleSlope = ds.RescaleSlope
-                vol_max = np.max(np_array)
-                RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
-                doUpdateRescaleSlope = True
-                if verbose:
-                    print("MAX EXCEEDED - RECALCULATING RESCALE SLOPE")
-                    print("WAS: %f\nIS: %f" % (old_RescaleSlope,RescaleSlope))
-            else:
-                RescaleSlope = ds.RescaleSlope
-
     # List files, do not need to be ordered
     for f in dcm_slices:
         ds = dcmread(f)
         i = int(ds.InstanceNumber)-1
 
-        # UPDATE CHANGE RESCALESLOPE
-        if doUpdateRescaleSlope:
-            ds.RescaleSlope = RescaleSlope
-
-
+        # Get single slice
         if from_type == 'minc' and is_4D:
             assert ds.pixel_array.shape == (np_array.shape[2],np_array.shape[3])
             data_slice = np_array[i // numberofslices,i % numberofslices,:,:]
@@ -289,19 +264,34 @@ def to_dcm(np_array,
         else:
             sys.exit('You must specify a from_type when using to_dcm function')
 
-        data_slice /= float(RescaleSlope)
-        if np.max(data_slice) > SIGNED_FLOAT_MAXIMUM:
-            print("OOOOPS - NEGATIVE VALUES OCCURED!!!")
-            print(np.max(data_slice),ds.RescaleSlope,RescaleSlope)
-        data_slice = data_slice.astype('int16') # To signed short
+        # Check for Data Rescale
+        if hasattr(ds, 'RescaleSlope'):
+            # Calculate new rescale slope if needed
+            if forceRescaleSlope or (np.max(data_slice) - ds.RescaleIntercept )/ds.RescaleSlope > _CONSTANTS[data_type]:
+                ds.RescaleSlope = ( np.max(np_array)-ds.RescaleIntercept + 0.000000000001 ) / float(_CONSTANTS[data_type])
+                if verbose:
+                    print(f"Setting RescaleSlope to {ds.RescaleSlope}")
+
+            # Normalize using RescaleSlope and RescaleIntercept
+            data_slice = (data_slice - ds.RescaleIntercept) / ds.RescaleSlope
+
+        # Assert ranges
+        #assert np.max(data_slice) <= _CONSTANTS[data_type], f"Data must be below absolute max ({_CONSTANTS[data_type]}) for {data_type} dicom container. Was {np.max(data_slice)}"
+        if not np.max(data_slice) <= _CONSTANTS[data_type]:
+            raise ValueError( f"Data must be below absolute max ({_CONSTANTS[data_type]}) for {data_type} dicom container. Was {np.max(data_slice)} after applying RescaleIntercept and RescaleSlope." )
+            return
+        if data_type.startswith('u'): # Only applies to unsigned, e.g. uint16
+            if not np.min(data_slice) >= 0:
+                raise ValueError( f"Data must be strictly positive for {data_type} dicom container. Was {np.min(data_slice)} after applying RescaleIntercept and RescaleSlope." )
+                return
+            #assert np.min(data_slice) >= 0, f"Data must be strictly positive for {data_type} dicom container. Was {np.min(data_slice)}"
+        data_slice = data_slice.astype(data_type) # This will fail without warning if the above assertions is not meet!
 
         # Insert pixel-data
         ds.PixelData = data_slice.tostring()
 
-        # Update LargesImagetPixelValue tag. OBS: This could be done individually per slice.. Here it is done with global value.
-        ds.LargestImagePixelValue = LargestImagePixelValue
-        if hasattr(ds,'RescaleSlope') and doUpdateRescaleSlope: # Make sure we are within the range
-            ds.LargestImagePixelValue = np.minimum(int(np.ceil( ds.LargestImagePixelValue / ds.RescaleSlope ) ),SIGNED_FLOAT_MAXIMUM)
+        # Update LargesImagetPixelValue tag pr slice
+        ds.LargestImagePixelValue = int(np.ceil(data_slice.max()))
 
         if modify:
             if verbose:
@@ -340,7 +330,9 @@ def mnc_to_dcm(mncfile,
                study_id=None,
                checkForFileEndings=True,
                forceRescaleSlope=False,
-               zero_clamp=False):
+               zero_clamp=False,
+               clamp_lower: int=None,
+               clamp_upper: int=None):
     """Convert a minc file to dicom
 
     Parameters
@@ -364,6 +356,10 @@ def mnc_to_dcm(mncfile,
         Forces recalculation of rescale slope
     zero_clamp : boolean, optional
         Force the non-zero element in the input to be zero
+    clamp_lower : int, optional
+        Force a lower bound on the input data
+    clamp_upper : int, optional
+        Force an upper bound on the input data
 
     Examples
     --------
@@ -380,6 +376,12 @@ def mnc_to_dcm(mncfile,
     # Remove non-zero elements
     if zero_clamp:
         np_minc[ np_minc < 0 ] = 0.0
+
+    # Force values to lie within a range accepted by the dicom container
+    if clamp_lower is not None:
+        np_minc = np.maximum( np_minc, clamp_lower )
+    if clamp_upper is not None:
+        np_minc = np.minimum( np_minc, clamp_upper )
 
     to_dcm(np_array=np_minc,
            dicomcontainer=dicomcontainer,
@@ -410,7 +412,9 @@ def nifty_to_dcm(nftfile,
                  study_id=None,
                  patient_id=None,
                  checkForFileEndings=True,
-                 forceRescaleSlope=False):
+                 forceRescaleSlope=False,
+                 clamp_lower: int=None,
+                 clamp_upper: int=None):
     """Convert a minc file to dicom
     Parameters
     ----------
@@ -433,6 +437,10 @@ def nifty_to_dcm(nftfile,
         Sets the PatientName and PatientID tag in the dicom files
     forceRescaleSlope : boolean, optional
         Forces recalculation of rescale slope
+    clamp_lower : int, optional
+        Force a lower bound on the input data
+    clamp_upper : int, optional
+        Force an upper bound on the input data
 
     Examples
     --------
@@ -440,25 +448,13 @@ def nifty_to_dcm(nftfile,
     >>> nifty_to_dcm('PETCT_new.nii.gz', 'PETCT', 'PETCT_new', description="PETCT_new", id="600")
     """
 
-    ## NEED TO REUSE THIS PART OF CODE FROM to_dcm TO GET ds.pixel_array.dtype
-    if checkForFileEndings:
-        dcmcontainer = look_for_dcm_files(dicomcontainer)
-        if dcmcontainer == -1:
-            print("Could not find dicom files in container..")
-            exit(-1)
-    else:
-        dcmcontainer = dicomcontainer
+    np_nifti = nib.load(nftfile).get_fdata()
 
-    # change path str to path object
-    if isinstance(dcmcontainer, str):
-        dcmcontainer = Path(dcmcontainer)
-
-    # gather the dicom slices from the container
-    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
-
-    # Get information about the dataset from a single file
-    ds = dcmread(dcm_slices[0])
-    np_nifti = nib.load(nftfile).get_fdata().astype(ds.pixel_array.dtype)
+    # Force values to lie within a range accepted by the dicom container
+    if clamp_lower is not None:
+        np_nifti = np.maximum( np_nifti, clamp_lower )
+    if clamp_upper is not None:
+        np_nifti = np.minimum( np_nifti, clamp_upper )
 
     to_dcm(np_array=np_nifti,
            dicomcontainer=dicomcontainer,
