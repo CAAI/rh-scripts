@@ -18,7 +18,7 @@ from rhscripts.dcm import generate_SeriesInstanceUID, generate_SOPInstanceUID
 
 
 def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
-    """Return the number of files with one of the extensions, 
+    """Return the number of files with one of the extensions,
     or -1 no files were found, or if more than one type of extension is found
 
     Parameters
@@ -51,7 +51,7 @@ def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
         return extensions[counts.index(max(counts))]
 
 def look_for_dcm_files(folder):
-    """Return first folder found with one of the extensions, 
+    """Return first folder found with one of the extensions,
     or -1 no files were found, or if more than one type of extension is found
 
     Parameters
@@ -78,7 +78,7 @@ def look_for_dcm_files(folder):
         if findExtension(root) != -1:
             return root
     return -1
-        
+
 def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFileEndings=True):
     """Convert a folder with dicom files to minc
 
@@ -99,7 +99,7 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
 
     Notes
     -----
-    
+
 
     Examples
     --------
@@ -107,7 +107,7 @@ def dcm_to_mnc(folder,target='.',fname=None,dname=None,verbose=False,checkForFil
     >>> dcm_to_mnc('folderA',target='folderB',fname='PETCT',dname='mnc',checkForFileEndings=False)
     """
     dcmcontainer = look_for_dcm_files(folder) if checkForFileEndings else folder
-    
+
     if dcmcontainer == -1:
         print("Could not find dicom files in container..")
         exit(-1)
@@ -135,7 +135,7 @@ def dcm_to_nifty(source_dir, output_dir, out_filename, compress='y'):
     """
     # uncomment that when we have dealt with str vs path objects
     # dcmcontainer = look_for_dcm_files(source_dir)
-    
+
     converter = Dcm2niix()
     converter.inputs.source_dir = source_dir
     converter.inputs.compress = compress
@@ -157,7 +157,7 @@ def to_dcm(np_array,
            patient_id=None,
            checkForFileEndings=True,
            forceRescaleSlope=False,
-           from_type='minc'):  
+           from_type='minc'):
     """Convert a numpy array (initially loaded from minc or nifty file) to dicom
 
     Parameters
@@ -188,47 +188,50 @@ def to_dcm(np_array,
     >>> to_dcm(array,'PETCT','PETCT_new',description="PETCT_new",id="600")
     """
 
+    # CONSTANT(S)
+    SIGNED_FLOAT_MAXIMUM = 32767
+
     if verbose:
         print("Converting to DICOM")
 
     if description or study_id:
         modify = True
-    
+
     if checkForFileEndings:
         dcmcontainer = look_for_dcm_files(dicomcontainer)
         if dcmcontainer == -1:
             sys.exit("Could not find dicom files in container..")
     else:
         dcmcontainer = dicomcontainer
-        
+
     # change path str to path object
     if isinstance(dcmcontainer, str):
-        dcmcontainer = Path(dcmcontainer) 
-        
+        dcmcontainer = Path(dcmcontainer)
+
     # gather the dicom slices from the container
     dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
-    
+
     # Determine if this is a 4D array
     if is_4D := ( hasattr(ds, 'NumberOfSlices') and len(np_array.shape) == 4 ):
         numberofslices = ds.NumberOfSlices # Get the number of slices per time point
         if verbose:
             print("Converting a 4D array")
-    
+
     # Check that the correct number of files exists
-    if from_type == 'minc' and is_4D: 
+    if from_type == 'minc' and is_4D:
         totalSlicesInArray = np_array.shape[0]*np_array.shape[1]
-    if from_type == 'minc' and not is_4D: 
+    if from_type == 'minc' and not is_4D:
         totalSlicesInArray = np_array.shape[0]
-    if from_type == 'nifty' and is_4D: 
+    if from_type == 'nifty' and is_4D:
         sys.exit('Nifty 4D conversion not yet implemented')
-    if from_type == 'nifty' and not is_4D: 
+    if from_type == 'nifty' and not is_4D:
         totalSlicesInArray = np_array.shape[2]
-        
+
     if verbose:
-        print("The number of files ( {} ) equals number of slices ( {} )" % (len(dcm_slices), totalSlicesInArray))
+        print("Checkinf if the number of files ( {} ) equals number of slices ( {} )".format(len(dcm_slices), totalSlicesInArray))
     assert len(dcm_slices) == totalSlicesInArray
 
     ## Prepare for MODIFY HEADER
@@ -239,19 +242,19 @@ def to_dcm(np_array,
     if isinstance(dicomfolder, str):
         dicomfolder = Path(dicomfolder)
     dicomfolder.mkdir(parents=True, exist_ok=True)
-    
 
     # Calculate new rescale slope if not 1
     RescaleSlope = 1.0
     doUpdateRescaleSlope = False
     if hasattr(ds, 'RescaleSlope'):
         if forceRescaleSlope:
-            RescaleSlope = np.max(np_array) / float(ds.LargestImagePixelValue) + 0.000000000001
+            RescaleSlope = np.max(np_array) / float(SIGNED_FLOAT_MAXIMUM) + 0.000000000001
             doUpdateRescaleSlope = True
             if verbose:
                 print(f"Setting RescaleSlope from {ds.RescaleSlope} to {RescaleSlope}")
         elif not ds.RescaleSlope == RescaleSlope:
-            if np.max(np_array)/ds.RescaleSlope+ds.RescaleIntercept > 32767:
+            # OBS: the SIGNED_FLOAT_MAXIMUM might not fit all dicom datasets (e.g. unsigned short is 2xSIGNED_FLOAT_MAXIMUM..)
+            if np.max(np_array)/ds.RescaleSlope+ds.RescaleIntercept > SIGNED_FLOAT_MAXIMUM:
                 old_RescaleSlope = ds.RescaleSlope
                 vol_max = np.max(np_array)
                 RescaleSlope = vol_max / float(ds.LargestImagePixelValue) + 0.000000000001
@@ -266,12 +269,12 @@ def to_dcm(np_array,
     for f in dcm_slices:
         ds = dcmread(f)
         i = int(ds.InstanceNumber)-1
-        
+
         # UPDATE CHANGE RESCALESLOPE
         if doUpdateRescaleSlope:
             ds.RescaleSlope = RescaleSlope
 
-        
+
         if from_type == 'minc' and is_4D:
             assert ds.pixel_array.shape == (np_array.shape[2],np_array.shape[3])
             data_slice = np_array[i // numberofslices,i % numberofslices,:,:]
@@ -285,17 +288,21 @@ def to_dcm(np_array,
             sys.exit('Nifty 4D conversion not yet implemented')
         else:
             sys.exit('You must specify a from_type when using to_dcm function')
-        
+
         data_slice /= float(RescaleSlope)
-        if np.max(data_slice) > 32767:
+        if np.max(data_slice) > SIGNED_FLOAT_MAXIMUM:
             print("OOOOPS - NEGATIVE VALUES OCCURED!!!")
             print(np.max(data_slice),ds.RescaleSlope,RescaleSlope)
         data_slice = data_slice.astype('int16') # To signed short
 
         # Insert pixel-data
         ds.PixelData = data_slice.tostring()
+
+        # Update LargesImagetPixelValue tag. OBS: This could be done individually per slice.. Here it is done with global value.
         ds.LargestImagePixelValue = LargestImagePixelValue
-        
+        if hasattr(ds,'RescaleSlope') and doUpdateRescaleSlope: # Make sure we are within the range
+            ds.LargestImagePixelValue = np.minimum(int(np.ceil( ds.LargestImagePixelValue / ds.RescaleSlope ) ),SIGNED_FLOAT_MAXIMUM)
+
         if modify:
             if verbose:
                 print("Modifying DICOM headers")
@@ -323,7 +330,7 @@ def to_dcm(np_array,
 
     if verbose:
         print("Output written to %s" % dicomfolder)
-        
+
 def mnc_to_dcm(mncfile,
                dicomcontainer,
                dicomfolder,
@@ -333,7 +340,7 @@ def mnc_to_dcm(mncfile,
                study_id=None,
                checkForFileEndings=True,
                forceRescaleSlope=False,
-               zero_clamp=False):  
+               zero_clamp=False):
     """Convert a minc file to dicom
 
     Parameters
@@ -363,17 +370,17 @@ def mnc_to_dcm(mncfile,
     >>> from rhscripts.conversion import mnc_to_dcm
     >>> mnc_to_dcm('PETCT_new.mnc','PETCT','PETCT_new',description="PETCT_new",id="600")
     """
-    
+
     # Load the minc file
     import pyminc.volumes.factory as pyminc
     minc = pyminc.volumeFromFile(mncfile)
     np_minc = np.array(minc.data)
     minc.closeVolume()
-    
+
     # Remove non-zero elements
     if zero_clamp:
         np_minc[ np_minc < 0 ] = 0.0
-    
+
     to_dcm(np_array=np_minc,
            dicomcontainer=dicomcontainer,
            dicomfolder=dicomfolder,
@@ -387,7 +394,7 @@ def mnc_to_dcm(mncfile,
 
 
 """ DEPRECATED FUNCTION. """
-def mnc_to_dcm_4D(*args, **kwargs):  
+def mnc_to_dcm_4D(*args, **kwargs):
     warnings.warn("mnc_to_dcm_4D has been replaced by mnc_to_dcm which incorporates the full functionality.",
                   DeprecationWarning)
     time.sleep(5)
@@ -403,7 +410,7 @@ def nifty_to_dcm(nftfile,
                  study_id=None,
                  patient_id=None,
                  checkForFileEndings=True,
-                 forceRescaleSlope=False):  
+                 forceRescaleSlope=False):
     """Convert a minc file to dicom
     Parameters
     ----------
@@ -426,14 +433,14 @@ def nifty_to_dcm(nftfile,
         Sets the PatientName and PatientID tag in the dicom files
     forceRescaleSlope : boolean, optional
         Forces recalculation of rescale slope
-        
+
     Examples
     --------
     >>> from rhscripts.conversion import nifty_to_dcm
     >>> nifty_to_dcm('PETCT_new.nii.gz', 'PETCT', 'PETCT_new', description="PETCT_new", id="600")
     """
-    
-    ## NEED TO REUSE THIS PART OF CODE FROM to_dcm TO GET ds.pixel_array.dtype   
+
+    ## NEED TO REUSE THIS PART OF CODE FROM to_dcm TO GET ds.pixel_array.dtype
     if checkForFileEndings:
         dcmcontainer = look_for_dcm_files(dicomcontainer)
         if dcmcontainer == -1:
@@ -441,18 +448,18 @@ def nifty_to_dcm(nftfile,
             exit(-1)
     else:
         dcmcontainer = dicomcontainer
-        
+
     # change path str to path object
     if isinstance(dcmcontainer, str):
-        dcmcontainer = Path(dcmcontainer) 
-        
+        dcmcontainer = Path(dcmcontainer)
+
     # gather the dicom slices from the container
     dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
     np_nifti = nib.load(nftfile).get_fdata().astype(ds.pixel_array.dtype)
-    
+
     to_dcm(np_array=np_nifti,
            dicomcontainer=dicomcontainer,
            dicomfolder=dicomfolder,
@@ -464,16 +471,16 @@ def nifty_to_dcm(nftfile,
            checkForFileEndings=checkForFileEndings,
            forceRescaleSlope=forceRescaleSlope,
            from_type='nifty')
-        
+
 
 def rtdose_to_mnc(dcmfile,mncfile):
-    
+
     """Convert dcm file (RD dose distribution) to minc file
 
     Parameters
     ----------
     dcmfile : string
-        Path to the dicom file (RD type)    
+        Path to the dicom file (RD type)
     mncfile : string
         Path to the minc file
 
@@ -485,18 +492,18 @@ def rtdose_to_mnc(dcmfile,mncfile):
 
     # Load the dicom
     ds = dicom.dcmread(dcmfile)
-    
+
     # Extract the starts and steps of the x,y,z space
     starts = ds.ImagePositionPatient
     steps = [float(i) for i in ds.PixelSpacing];
     if not (ds.SliceThickness==''):
         dz = ds.SliceThickness
-    elif 'GridFrameOffsetVector' in ds: 
+    elif 'GridFrameOffsetVector' in ds:
         dz = ds.GridFrameOffsetVector[1] -ds.GridFrameOffsetVector[0]
     else:
         raise IOError("Cannot determine slicethickness!")
     steps.append(dz)
-    
+
     #reorder the starts and steps!
     myorder = [2,1,0]
     starts = [ starts[i] for i in myorder]
@@ -505,15 +512,15 @@ def rtdose_to_mnc(dcmfile,mncfile):
     #change the sign (e.g. starts=[1,-1,-1].*starts)
     starts = [a*b for a,b in zip([1,-1,-1],starts)]
     steps = [a*b for a,b in zip([1,-1,-1],steps)]
-    
+
     #Get the pixel data and scale it correctly
     dose_array = ds.pixel_array*float(ds.DoseGridScaling)
-    
+
     # Write the output minc file
     import pyminc.volumes.factory as pyminc
     out_vol = pyminc.volumeFromData(mncfile,dose_array,dimnames=("zspace", "yspace", "xspace"),starts=starts,steps=steps)
-    out_vol.writeFile() 
-    out_vol.closeVolume() 
+    out_vol.writeFile()
+    out_vol.closeVolume()
 
 
 def rtx_to_mnc(dcmfile,
@@ -524,13 +531,13 @@ def rtx_to_mnc(dcmfile,
                dry_run=False,
                roi_name=None,
                crop_area=False):
-    
+
     """Convert dcm file (RT struct) to minc file
 
     Parameters
     ----------
     dcmfile : string
-        Path to the dicom file (RT struct)    
+        Path to the dicom file (RT struct)
     mnc_container_file : string
         Path to the minc file that is the container of the RT struct
     mnc_output_file : string
@@ -553,8 +560,8 @@ def rtx_to_mnc(dcmfile,
 
     try:
         import pyminc.volumes.factory as pyminc
-        RTSS = dicom.read_file(dcmfile) 
-            
+        RTSS = dicom.read_file(dcmfile)
+
         ROIs = RTSS.ROIContourSequence
 
         if verbose or dry_run:
@@ -587,10 +594,10 @@ def rtx_to_mnc(dcmfile,
                     assert contour.ContourGeometricType == "CLOSED_PLANAR"
 
                     current_slice_i_print = 0
-                    
+
                     if verbose:
                         print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
-                    
+
                     world_coordinate_points = np.array(contour.ContourData)
                     world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
                     current_slice = np.zeros((volume.getSizes()[1],volume.getSizes()[2]))
@@ -604,7 +611,7 @@ def rtx_to_mnc(dcmfile,
                     converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
                     cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
 
-                    RTMINC.data[int(round(current_slice_i))] += current_slice_inner                    
+                    RTMINC.data[int(round(current_slice_i))] += current_slice_inner
 
             if not dry_run:
                 # Remove even areas - implies a hole.
@@ -637,15 +644,15 @@ def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
     Parameters
     ----------
     infile : string
-        Path to the input mnc file   
+        Path to the input mnc file
     outfile : string
-        Path to the outputmnc file 
+        Path to the outputmnc file
     kvp : int, optional
-        Integer that specify the kVp on CT scan (overwrites the search for a value)       
+        Integer that specify the kVp on CT scan (overwrites the search for a value)
     mrac: boolean, optional
         if set, scales the LAC [cm^-1] by 10000
     verbose : boolean, optional
-        Set the verbosity       
+        Set the verbosity
     Examples
     --------
     >>> from rhscripts.conversion import hu2lac
@@ -658,20 +665,20 @@ def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
             return
         else:
             kvp = int(kvp)
-    print('kvp = ' + str(kvp))            
+    print('kvp = ' + str(kvp))
 
     if mrac:
         fscalefactor = 10000
     else:
         fscalefactor = 1
-        
+
     if kvp==100:
         cmd = 'minccalc -expression \"if(A[0]<52){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000443+0.0544)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
     elif kvp == 120:
         cmd = 'minccalc -expression \"if(A[0]<47){ ((A[0]+1000)*0.000096)*'+str(fscalefactor)+'; } else { ((A[0]+1000)*0.0000510+0.0471)*'+str(fscalefactor)+'; }\" ' + infile + ' ' + outfile + ' -clobber'
     else:
         print('No conversion for this KVP!')
-        return        
+        return
 
     if verbose:
         print(cmd)
@@ -686,15 +693,15 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
     Parameters
     ----------
     infile : string
-        Path to the input mnc file   
+        Path to the input mnc file
     outfile : string
-        ath to the outputmnc file 
+        ath to the outputmnc file
     kvp : int, optional
-        Integer that specify the kVp on CT scan (overwrites the search for a value)     
+        Integer that specify the kVp on CT scan (overwrites the search for a value)
     mrac: boolean, optional
         if set, accounts for the fact that LAC [cm^-1] is multiplyed by 10000
     verbose : boolean, optional
-        Set the verbosity        
+        Set the verbosity
     Examples
     --------
     >>> from rhscripts.conversion import lac2hu
@@ -707,18 +714,18 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
             return
         else:
             kvp = int(kvp)
-    print('kvp = ' + str(kvp))       
-        
+    print('kvp = ' + str(kvp))
+
     if mrac:
         fscalefactor = 10000
     else:
         fscalefactor = 1
-        
+
     if kvp==100:
         breakpoint = ((52+1000)*0.000096)*fscalefactor
         cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0544)/0.0000443 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
     elif kvp == 120:
-        breakpoint = ((47+1000)*0.000096)*fscalefactor        
+        breakpoint = ((47+1000)*0.000096)*fscalefactor
         cmd = 'minccalc -expression \"if(A[0]<'+str(breakpoint)+'){((A[0]/'+str(fscalefactor)+')/0.000096)-1000; } else { ((A[0]/'+str(fscalefactor)+')-0.0471)/0.0000510 - 1000; }\" ' + infile + ' ' + outfile + ' -clobber'
     else:
         print('No conversion for this KVP!')
@@ -726,5 +733,5 @@ def lac2hu(infile,outfile,kvp=None,mrac=False,verbose=False):
 
     if verbose:
         print(cmd)
-    
-    os.system(cmd)                 
+
+    os.system(cmd)
