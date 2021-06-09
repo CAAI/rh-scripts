@@ -14,8 +14,11 @@ from pathlib import Path
 import numpy as np
 import time, warnings
 import cv2
+import random
+import socket
 from rhscripts.dcm import generate_SeriesInstanceUID, generate_SOPInstanceUID
-
+from rhscripts.version import __version__
+import datetime
 
 def findExtension(sourcedir,extensions = [".ima", ".IMA", ".dcm", ".DCM"]):
     """Return the number of files with one of the extensions,
@@ -518,6 +521,391 @@ def rtdose_to_mnc(dcmfile,mncfile):
     out_vol.writeFile()
     out_vol.closeVolume()
 
+def to_rtx(np_roi: np.ndarray,
+           dcmcontainer: str,
+           out_folder: str,
+           out_filename: str,
+           verbose: bool=False):
+
+    """Convert label numpy array to RT struct dicom file
+
+    Parameters
+    ----------
+    np_roi : np.ndarray
+        Numpy array in memory to be converted. Assume integer values of [0,1(,..)]
+    dcmcontainer : string
+        Path to dicom container to be used
+    out_folder : string
+        Name of the output folder
+    out_filename : string
+        Name of the output dicom file
+    verbose : boolean, optional
+        Verbosity of function
+    """
+
+    from pydicom.sequence import Sequence
+    from pydicom.dataset import Dataset, FileDataset
+    from decimal import Decimal, getcontext
+    getcontext().prec = 7
+
+    # Create affine transformation matrix:
+    def get_affine_transform(first_scan_path,last_scan_path,series_length):
+        # Load headers.
+        dicom_header_first = dicom.dcmread(first_scan_path)
+        dicom_header_last = dicom.dcmread(last_scan_path)
+
+        # Extract header info.
+        IOP = dicom_header_first.ImageOrientationPatient # Orientation is the same for all slices.
+        IOP = [float(i) for i in IOP]
+
+        IPP = dicom_header_first.ImagePositionPatient # Position of first slice.
+        IPP = [float(i) for i in IPP]
+
+        IPP2 = dicom_header_last.ImagePositionPatient # Position of last slice.
+        IPP2 = [float(i) for i in IPP2]
+
+        PS = dicom_header_first.PixelSpacing # Pixel Spacing is the same for all slices.
+        PS = [float(i) for i in PS]
+
+        # Creat empty matrix M.
+        M = np.zeros([4,4])
+
+        # Fill first column. Direction and Spacing for X coordinate.
+        M[0,0]=IOP[0]*PS[0]
+        M[1,0]=IOP[1]*PS[0]
+        M[2,0]=IOP[2]*PS[0]
+
+        # Fill second column. Direction and Spacing for Y coordinate.
+        M[0,1]=IOP[3]*PS[1]
+        M[1,1]=IOP[4]*PS[1]
+        M[2,1]=IOP[5]*PS[1]
+
+        # Fill third column. Direction and Spacing for Z coordinate.
+        M[0,2]=(IPP[0]-IPP2[0])/(1-series_length)
+        M[1,2]=(IPP[1]-IPP2[1])/(1-series_length)
+        M[2,2]=(IPP[2]-IPP2[2])/(1-series_length)
+
+        # Fill fourth column. Coordinate shift.
+        M[0,3]=IPP[0]
+        M[1,3]=IPP[1]
+        M[2,3]=IPP[2]
+        M[3,3]=1
+
+        return M
+
+    # Mask --> Polyline transform.
+    def get_polylines(mask,affine_transform_matrix,series_length):
+        # Create empty list to fill with contours.
+        polylines = []
+        for i in range(series_length): # Create a list space for each input slice. There are probably better ways to do this!
+            polylines.append([])
+
+        # Extract contours from mask and save as polylines.
+        for i in range(series_length):
+            contours, hierarchy = cv2.findContours(mask[:,:,i], cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE) # Convert masks to contours.
+            for contour in contours: # Loop through contours.
+                contour_list = np.ndarray.tolist(contour) # Convert numpy array to list.
+                polyline = list() # Create empty polyline container.
+                for triplet in contour_list: # Loop through contour coordinate triplets.
+                    triplet = triplet[0] # Modify list structure.
+                    triplet.append(i+1) # Add Z dimension.
+                    triplet.append(1) # Add fourth dimension for matrix multiplication.
+                    triplet = list(np.matmul(affine_transform_matrix,triplet)) # Multiply coordinate with affine transform matrix.
+                    triplet.pop() # Remove fourth dimension.
+                    for coord in triplet: # Loop through single coordinates.
+                        polyline.append(str(coord)) # Convert each number to string format for dicom header.
+                polylines[i].append(polyline) # Save polyline.
+                print("APPENDING")
+        return polylines
+
+
+    # Define filter function for incoming image series:
+    def checkEqual(lst):
+       return lst[1:] == lst[:-1]
+
+    # Define function for expanding point and line delineations:
+    def expand_polyline(poly_input,M):
+
+        input_length = len(poly_input)
+        x_shift = Decimal((M[0][0])/2)
+        y_shift = Decimal((M[1][1])/2)
+
+        poly_input = [Decimal(item) for item in poly_input]
+
+        expanded_poly = list()
+
+        # Expand point delineations:
+        if input_length == 3:
+            expanded_poly.append([str(poly_input[0]+x_shift),str(poly_input[1]+y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]+x_shift),str(poly_input[1]-y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]-x_shift),str(poly_input[1]+y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]-x_shift),str(poly_input[1]-y_shift),str(poly_input[2])])
+
+            expanded_poly = [list(i) for i in set(map(tuple, expanded_poly))] # Remove duplicated triplets.
+
+        # Expand line delineations:
+        if input_length == 6:
+            expanded_poly.append([str(poly_input[0]+x_shift),str(poly_input[1]+y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]+x_shift),str(poly_input[1]-y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]-x_shift),str(poly_input[1]+y_shift),str(poly_input[2])])
+            expanded_poly.append([str(poly_input[0]-x_shift),str(poly_input[1]-y_shift),str(poly_input[2])])
+
+            expanded_poly.append([str(poly_input[3]+x_shift),str(poly_input[4]+y_shift),str(poly_input[5])])
+            expanded_poly.append([str(poly_input[3]+x_shift),str(poly_input[4]-y_shift),str(poly_input[5])])
+            expanded_poly.append([str(poly_input[3]-x_shift),str(poly_input[4]+y_shift),str(poly_input[5])])
+            expanded_poly.append([str(poly_input[3]-x_shift),str(poly_input[4]-y_shift),str(poly_input[5])])
+
+            expanded_poly = [list(i) for i in set(map(tuple, expanded_poly))] # Remove duplicated triplets.
+
+        polyline = list()
+        for item in expanded_poly:
+            polyline+=item
+
+        return polyline
+
+    # change path str to path object
+    if isinstance(dcmcontainer, str):
+        dcmcontainer = Path(dcmcontainer)
+
+    # gather the dicom slices from the container
+    dcm_list = [str(f) for f in dcmcontainer.iterdir() if not f.name.startswith('.') and f.is_file()]
+    ref_dict = dict() # Store dcm image SOP Instance UID's and file name for later use.
+    series_list = list() # For checking that all slices are from the same series.
+
+    # Fill out numpy matrix and reference dictionary.
+    for files in dcm_list:
+        dcm_slice = dcmread(files)
+        ref_dict[dcm_slice.InstanceNumber]=[dcm_slice.SOPInstanceUID,files]
+        series_list.append(dcm_slice.SeriesInstanceUID)
+
+    # Check that all dicom images in the folder belong to the same series.
+    if checkEqual(series_list) == False:
+        print("Error: All image slices must belong to the same series.")
+        sys.exit()
+
+    # Get first and last image from dicom series.
+    first_scan_path = ref_dict[1][1]
+    last_scan_path = ref_dict[len(dcm_list)][1]
+
+    # Read dicom header from first file.
+    dicom_header_first = dicom.dcmread(first_scan_path)
+
+    # Get current time.
+    time = datetime.datetime.now()
+
+    # Get image modality to determine SOP class UID for later.
+    image_modality = dicom_header_first.Modality
+    if image_modality == "CT":
+        SOP_class_UID = '1.2.840.10008.5.1.4.1.1.2'
+    elif image_modality == "MR":
+        SOP_class_UID = '1.2.840.10008.5.1.4.1.1.4'
+    elif image_modality == "PT":
+        #SOP_class_UID = '1.2.840.10008.5.1.4.1.1.20'
+        SOP_class_UID = '1.2.840.10008.5.1.4.1.1.128'
+
+    # Create new series instance UID.
+    newSIUID = generate_SeriesInstanceUID()
+
+    #%% Create RT file:
+
+    # Create dicom meta header.
+    file_meta = Dataset()
+
+    file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.481.3' # (0002,0002) Media Storage SOP Class UID
+    file_meta.MediaStorageSOPInstanceUID = newSIUID # (0002,0003) Media Storage SOP Instance UID
+    file_meta.TransferSyntaxUID = '1.2.840.10008.1.2' # (0002,0010) Transfer Syntax UID
+    file_meta.ImplementationClassUID = "1.2.826.0.1.3680043.8.691.0.21" # (0002,0012) Implementation Class UID
+    file_meta.ImplementationVersionName = '1.0' # (0002,0013) Implementation Version Name
+
+    # Create dicom dataset.
+    RTSTRUCT = FileDataset('RT',{},preamble=b"\0" * 128,file_meta=file_meta)
+
+    # Fill dicom header using the input scan series.
+    RTSTRUCT.InstanceCreationDate = time.strftime('%Y%m%d') # (0008,0012) Instance Creation Date (YYYYMMDD)
+    RTSTRUCT.InstanceCreationTime = time.strftime('%H%M%S') # (0008,0013) Instance Creation Time (HHMMSS)
+    RTSTRUCT.SOPClassUID = '1.2.840.10008.5.1.4.1.1.481.3' # (0008,0016) SOP Class UID
+    RTSTRUCT.SOPInstanceUID = newSIUID # (0008,0018) SOP Instance UID
+
+    # Patient Information.
+    RTSTRUCT.PatientName = dicom_header_first.PatientName # (0010,0010) Patient Name
+    RTSTRUCT.PatientID = dicom_header_first.PatientID # (0010,0020) Patient ID
+    RTSTRUCT.PatientBirthDate = dicom_header_first.PatientBirthDate # (0010,0030) Patient Birth Date
+    RTSTRUCT.PatientSex = dicom_header_first.PatientSex # (0010,0040) Patient Sex
+
+    # Study Information.
+    RTSTRUCT.StudyInstanceUID = dicom_header_first.StudyInstanceUID # (0020,000d) Study Instance UID
+    RTSTRUCT.StudyDate = dicom_header_first.StudyDate # (0008,0020) Study Date (YYYYMMDD)
+    RTSTRUCT.StudyTime = dicom_header_first.StudyTime # (0008,0030) Study Time (HHMMSS)
+    RTSTRUCT.OperatorsName = '' # (0008,1070) Operators Name
+    RTSTRUCT.ReferringPhysicianName = dicom_header_first.ReferringPhysicianName # (0008,0090) Referring Physician Name
+    RTSTRUCT.StudyID = dicom_header_first.StudyID # (0020,0010) Study ID
+    RTSTRUCT.AccessionNumber = dicom_header_first.AccessionNumber # (0008,0050) Accession Number
+    RTSTRUCT.StudyDescription = dicom_header_first.StudyDescription # (0008,1030) Study Description
+    if 'ReferencedStudySequence' in dicom_header_first:
+        RTSTRUCT.ReferencedStudySequence = dicom_header_first.ReferencedStudySequence # (0008,1110) Referenced Study Sequence
+
+    # Series Information.
+    RTSTRUCT.Modality = 'RTSTRUCT' # (0008,0060) Modality
+    RTSTRUCT.SeriesInstanceUID = newSIUID # (0020,000e) Series Instance UID
+    RTSTRUCT.SeriesNumber = str(200 + random.randint(1,200)) # (0020,0011) Series Number
+    RTSTRUCT.SeriesDate = time.strftime('%Y%m%d') # (0008,0021) Series Date
+    RTSTRUCT.SeriesTime = time.strftime('%H%M%S') # (0008,0031) Series Time
+    RTSTRUCT.SeriesDescription = out_filename # (0008,103e) Series Description
+
+    # Equipment Information.
+    RTSTRUCT.Manufacturer = 'RH-SCRIPTS v{}'.format(__version__) # (0008,0070) Manufacturer
+    RTSTRUCT.StationName = socket.gethostname() # (0008,1010) Station Name
+
+    # Structure Set.
+    RTSTRUCT.StructureSetLabel = 'ROI' # (3006,0002) Structure Set Label
+    RTSTRUCT.StructureSetName = '' # (3006,0004) Structure Set Name
+    RTSTRUCT.StructureSetDate = time.strftime('%Y%m%d') # (3006,0008) Structure Set Date (YYYYMMDD)
+    RTSTRUCT.StructureSetTime = time.strftime('%H%M%S') # (3006,0009) Structure Set Time (HHMMSS)
+
+    RTSTRUCT.ReferencedFrameOfReferenceSequence = Sequence([Dataset()]) # (3006,0010) Referenced Frame Of Reference Sequence
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].FrameOfReferenceUID = dicom_header_first.FrameOfReferenceUID # (0020,0052) Frame Of Reference UID
+
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence = Sequence([Dataset()]) # (3006,0012) RT Referenced Study Sequence
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].ReferencedSOPClassUID = '1.2.840.10008.3.1.2.3.2' # (0008,1150) Referenced SOP Class UID
+    if 'ReferencedStudySequence' in dicom_header_first:
+        RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].ReferencedSOPInstanceUID = dicom_header_first.ReferencedStudySequence[0].ReferencedSOPInstanceUID # (0008, 1155) Referenced SOP Instance UID
+
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence = Sequence([Dataset()]) # (3006,0014) RT Referenced Series Sequence
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence[0].SeriesInstanceUID = dicom_header_first.SeriesInstanceUID # (0020,000e) Series Instance UID
+
+    RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence[0].ContourImageSequence = Sequence([Dataset()]) # (3006,0016) Contour Image Sequence
+    for i in range(len(ref_dict)):
+        contour = Dataset()
+        contour.ReferencedSOPClassUID = SOP_class_UID # (0008,1150) Referenced SOP Class UID
+        contour.ReferencedSOPInstanceUID = ref_dict[i+1][0] # (0008,1155) Referenced SOP Instance UID
+        if i == 0:
+            RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence[0].ContourImageSequence[0] = contour
+        else:
+            RTSTRUCT.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence[0].ContourImageSequence.append(contour)
+
+    RTSTRUCT.StructureSetROISequence = Sequence([Dataset()]) # (3006,0020)  Structure Set ROI Sequence
+    RTSTRUCT.ROIContourSequence = Sequence([Dataset()]) # (3006,0039)  ROI Contour Sequence
+
+    # Get Affine Transform Matrix.
+    M=get_affine_transform(first_scan_path,last_scan_path,len(dcm_list))
+
+    for i in range(np_roi.max()):
+
+        ROI_expanded = (np_roi == i+1).astype(int)
+        ROI_expanded = ROI_expanded.astype('uint8')
+
+        #polylines = get_polylines(ROI_expanded[:,:,:,i],M,len(dcm_list)) # Get polylines.
+        polylines = get_polylines(ROI_expanded,M,len(dcm_list)) # Get polylines.
+
+        roi_set = Dataset()
+        roi_set.ROINumber = str(i+1) # (3006,0022) ROI Number
+        roi_set.ReferencedFrameOfReferenceUID = dicom_header_first.FrameOfReferenceUID # (3006,0024) Referenced Frame of Reference UID
+        roi_set.ROIName = 'ROI_'+str(i+1) # (3006,0026) ROI Name
+        roi_set.ROIGenerationAlgorithm = 'AUTOMATIC' # (3006,0036) ROI Generation Algorithm
+        if i == 0:
+            RTSTRUCT.StructureSetROISequence[0] = roi_set
+        else:
+            RTSTRUCT.StructureSetROISequence.append(roi_set)
+
+        contour = Dataset()
+        contour.ROIDisplayColor = ['255', '0', '0'] # (3006,002a) ROI Display Color
+        contour.ReferencedROINumber = str(i+1) # (3006,0084) Referenced ROI Number
+        contour.ContourSequence = Sequence([Dataset()]) # (3006,0040)  Contour Sequence
+        if i == 0:
+            RTSTRUCT.ROIContourSequence[0] = contour
+        else:
+            RTSTRUCT.ROIContourSequence.append(contour)
+
+        contour_number = 1 # Initialize contour number.
+        for x in range(len(polylines)):
+            if polylines[x]:
+                for n in range(len(polylines[x])):
+                    poly = Dataset()
+                    poly.ContourImageSequence = Sequence([Dataset()]) # (3006,0016)  Contour Image Sequence
+                    poly.ContourImageSequence[0].ReferencedSOPClassUID = '1.2.840.10008.3.1.2.3.2' # (0008,1150) Referenced SOP Class UID
+                    poly.ContourImageSequence[0].ReferencedSOPInstanceUID = ref_dict[x+1][0] # (0008,1155) Referenced SOP Instance UID
+
+                    if len(polylines[x][n]) == 3 or len(polylines[x][n]) == 6: # Create additional triplets.
+                        polylines[x][n] = expand_polyline(polylines[x][n],M)
+
+                    poly.ContourGeometricType = 'CLOSED_PLANAR' # (3006,0042) Contour Geometric Type
+                    poly.NumberOfContourPoints = str(int(len(polylines[x][n])/3)) # (3006,0046) Number of Contour Points
+                    poly.ContourNumber = str(contour_number) # (3006,0048) Contour Number
+                    poly.ContourData = polylines[x][n] # (3006,0050) Contour Data
+
+                    if contour_number == 1:
+                        RTSTRUCT.ROIContourSequence[i].ContourSequence[0] = poly
+                    else:
+                        RTSTRUCT.ROIContourSequence[i].ContourSequence.append(poly)
+                    contour_number += 1 # Update contour number.
+
+    # Save RTSTRUCT file.
+    out_path = Path(out_folder).joinpath(out_filename+".dcm")
+    out_path.parent.mkdir(exist_ok=True,parents=True)
+    dicom.filewriter.write_file(str(out_path), RTSTRUCT, write_like_original=False)
+
+def mnc_to_rtx( mncfile: str,
+                dcmcontainer: str,
+                out_folder: str,
+                out_filename: str,
+                verbose: bool=False):
+
+    """Convert minc label file to RT struct dicom file
+
+    Parameters
+    ----------
+    mncfile : string
+       Path to minc-file to be converted. Assume integer values of [0,1(,..)]
+    dcmcontainer : string
+       Path to dicom container to be used
+    out_folder : string
+       Name of the output folder
+    out_filename : string
+       Name of the output dicom file
+    verbose : boolean, optional
+       Verbosity of function
+    """
+    # Load the minc file
+    import pyminc.volumes.factory as pyminc
+    minc = pyminc.volumeFromFile(mncfile,labels=True)
+    np_minc = np.array(minc.data,dtype='int8')
+    minc.closeVolume()
+
+    # Convert from axial-first to axial-last
+    np_minc = np.swapaxes( np.swapaxes( np_minc, 0, 1), 1, 2 )
+    to_rtx( np_roi=np_minc, dcmcontainer=dcmcontainer, out_folder=out_folder,
+            out_filename=out_filename,verbose=verbose)
+
+def nii_to_rtx( niifile: str,
+                dcmcontainer: str,
+                out_folder: str,
+                out_filename: str,
+                verbose: bool=False):
+
+    """Convert minc label file to RT struct dicom file
+
+    Parameters
+    ----------
+    niifile : string
+       Path to nifty-file to be converted. Assume integer values of [0,1(,..)]
+    dcmcontainer : string
+       Path to dicom container to be used
+    out_folder : string
+       Name of the output folder
+    out_filename : string
+       Name of the output dicom file
+    verbose : boolean, optional
+       Verbosity of function
+    """
+    # Load the minc file
+    np_nifti = nib.load(niifile).get_fdata()
+
+    # Convert from axial-first to axial-last
+    np_nifti = np.swapaxes( np.swapaxes( np_nifti, 0, 1), 1, 2 )
+    # More needed? UNTESTED!!
+
+    to_rtx( np_roi=np_nifti, dcmcontainer=dcmcontainer, out_folder=out_folder,
+            out_filename=out_filename,verbose=verbose)
 
 def rtx_to_mnc(dcmfile,
                mnc_container_file,
@@ -631,6 +1019,7 @@ def rtx_to_mnc(dcmfile,
     except InvalidDicomError:
         print("Could not read DICOM RTX file", dcmfile)
         exit(-1)
+
 
 
 def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
