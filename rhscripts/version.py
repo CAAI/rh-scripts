@@ -1,4 +1,4 @@
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 git_revision = ''
 
 """
@@ -25,6 +25,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.1.6 # Added replace_dicom_container function
   0.1.7 # Added nifty_to_dcm. Function merged with mnc_to_dcm* into to_dcm
   0.1.8 # Fixed RescaleSlope and RescaleIntercept, incl moving them in pr slice rather than global
+  0.1.9 # Added to_rtx and read_rtx
 """
 
 def __show_version__():
