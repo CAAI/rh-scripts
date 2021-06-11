@@ -1,4 +1,4 @@
-from nipype.interfaces.fsl import Threshold, IsotropicSmooth, RobustFOV, BET, FLIRT
+from nipype.interfaces.fsl import Threshold, IsotropicSmooth, RobustFOV, BET, FLIRT, ConvertXFM
 from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths, UnaryMaths
 from nipype.interfaces.niftyreg import RegResample, RegAladin, RegTransform
 
@@ -37,8 +37,8 @@ def reg_aladin(ref_file, flo_file, aff_file, res_file=None):
     Args:
         ref_file (a pathlike object or str): The input reference/target image
         flo_file (a pathlike object or str): The input floating/source image
-        res_file (a pathlike object or str): The affine transformed floating image
         aff_file (a pathlike object or str): The output affine matrix file
+        res_file (a pathlike object or str): The affine transformed floating image
     """
 
     ral = RegAladin()
@@ -207,7 +207,7 @@ def inv_mask(in_file, out_file):
 
 
 def merge_images(in_file1, in_file2, out_file):
-    """Add two images together in one file
+    """Adds two images together in one file
 
     Args:
         in_file1 (a pathlike object or str): Input image file 1
@@ -221,3 +221,22 @@ def merge_images(in_file1, in_file2, out_file):
     multiplier.inputs.operand_file = in_file2
     multiplier.inputs.out_file = out_file
     multiplier.run()
+    
+
+def concat_transforms(in_file1, in_file2, out_file=None):
+    """Concatenates two affine transforms.
+
+    Args:
+        in_file1 (a pathlike object or str): Affine transform file 1
+        in_file2 (a pathlike object or str): Affine transform file 2
+        out_file (a pathlike object or str, optional): Output filename. Defaults to None (overwrites file 2)
+    """
+    
+    concat = ConvertXFM()
+    concat.inputs.in_file = in_file1
+    concat.inputs.in_file2 = in_file2
+    concat.inputs.concat_xfm = True
+    if not out_file:
+        out_file = in_file2   # overwrite file 2
+    concat.inputs.out_file = out_file
+    concat.run()
