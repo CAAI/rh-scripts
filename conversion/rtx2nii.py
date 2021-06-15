@@ -28,7 +28,7 @@ if args.version:
 	__show_version__()
 	exit(-1)
 
-if not args.RTX or not args.MINC or not args.RTMINC:
+if not args.RTX or not args.container or not args.output:
 	parser.print_help()
 	print('Too few arguments')
 	exit(-1)
