@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os
+import os, math
 import pydicom as dicom
 import configparser
 import glob
@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple, Callable, Dict
 from pydicom import dcmread
+from pydicom.filereader import InvalidDicomError #For rtx2mnc
 import cv2
 import random
 import socket
@@ -689,8 +690,7 @@ def to_rtx(np_roi: np.ndarray,
 
     for i in range(np_roi.max()):
 
-        ROI_expanded = (np_roi == i+1).astype(int)
-        ROI_expanded = ROI_expanded.astype('uint8')
+        ROI_expanded = (np_roi == i+1).astype('uint8')
 
         #polylines = get_polylines(ROI_expanded[:,:,:,i],M,len(dcm_list)) # Get polylines.
         polylines = get_polylines(ROI_expanded,M,len(dcm_list)) # Get polylines.
@@ -744,6 +744,7 @@ def to_rtx(np_roi: np.ndarray,
 
 def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
               fn_world_to_voxel: Callable, behavior: str='default',
+              voxel_dims: Tuple[int,int,int]=[0,2,1],
               verbose: bool=False ) -> Dict[int, Dict[str,np.ndarray]]:
     """Read dcm file (RT struct) to dict of np.arrays - one for each ROI
 
@@ -758,6 +759,8 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
         Function to convert world coordinate to voxel coordinate
     behavior : string
         Chose how to convert to polygon. Options: default, mirada
+    flip_read_direction : boolean
+        ...
     verbose : boolean, optional
         Default = False (if true, print info)
     Examples
@@ -797,14 +800,19 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                 current_slice_i = 0
                 for wi,world in enumerate(world_coordinate_points):
                     voxel = fn_world_to_voxel([-world[0],-world[1],world[2]])
-                    current_slice_i = voxel[0]
-                    voxel_coordinates_inplane[wi,:] = [voxel[2],voxel[1]]
+                    current_slice_i = voxel[abs(voxel_dims[0])]
+                    # If voxel dim is negative, flip the direction
+                    if math.copysign(1,voxel_dims[0]) == -1:
+                        current_slice_i = img_size[0]-current_slice_i-1
+                    voxel_coordinates_inplane[wi,:] = [voxel[voxel_dims[1]],voxel[voxel_dims[2]]]
 
                 current_slice_inner = np.zeros((img_size[1],img_size[2]),dtype=np.float32)
                 if behavior == 'default':
+                    # Locate each voxel covered by, or located inside, a polygon contour
                     converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
                     cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
                 elif behavior == 'mirada':
+                    # Check for each voxel if its center is inside polygon
                     for x in range( img_size[1] ):
                         for y in range( img_size[2] ):
                             current_slice_inner[ x, y ] = cv2.pointPolygonTest(

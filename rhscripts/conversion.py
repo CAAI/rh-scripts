@@ -600,11 +600,11 @@ def rtx_to_mnc(dcmfile,
     mnc_output_file : string
         Path to the minc output file
     behavior : string
-        Chose how to convert to polygon. Options: default, mirada
+        Choose how to convert to polygon. Options: default, mirada
     verbose : boolean, optional
         Default = False (if true, print info)
     copy_name : boolean, optional
-        Default = False, If true the ROI name from Mirada is store in Minc header
+        Default = False, If true the ROI name from Mirada is stored in Minc header
     Examples
     --------
     >>> from rhscripts.conversion import rtx_to_mnc
@@ -631,6 +631,59 @@ def rtx_to_mnc(dcmfile,
             print('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+ROI['ROIname']+'" '+RTMINC_outname)
             os.system('minc_modify_header -sinsert dicom_0x0008:el_0x103e="'+ROI['ROIname']+'" '+RTMINC_outname)
     volume.closeVolume()
+
+def rtx_to_nii(dcmfile,
+               nii_container_file,
+               nii_output_file,
+               behavior: str='default',
+               verbose=False,
+               copy_name=False):
+
+    """Convert dcm file (RT struct) to nifty file
+
+    Parameters
+    ----------
+    dcmfile : string
+        Path to the dicom file (RT struct)
+    nii_container_file : string
+        Path to the nifty file that is the container of the RT struct
+    nii_output_file : string
+        Path to the nifty output file
+    behavior : string
+        Choose how to convert to polygon. Options: default, mirada
+    verbose : boolean, optional
+        Default = False (if true, print info)
+    copy_name : boolean, optional
+        Default = False, If true the ROI name from Mirada is stored in Nifty header
+    Examples
+    --------
+    >>> from rhscripts.conversion import rtx_to_nii
+    >>> rtx_to_nii('RTstruct.dcm','PET.nii.gz','RTstruct.nii.gz',verbose=False,copy_name=True)
+    """
+
+    # Check file ending of output assuming one of .nii and .nii.gz
+    suffix_length = 4 if nii_output_file.endswith('.nii') else 7
+
+    volume = nib.load(nii_container_file)
+
+    # Flip to axial-first orientation (assuming axial last)
+    data = np.swapaxes(volume.get_fdata(), 0, 2)
+    data = np.flip(volume, 0)
+
+    # Read RTX file. Returns dict of dict with outer key=ROI_index and inner_keys "ROIname" and "data"
+    ROI_output = read_rtx( dcmfile=dcmfile,
+                           img_size=data.shape,
+                           fn_world_to_voxel=lambda x: nib.affines.apply_affine(aff=np.linalg.inv(volume.affine),pts=x),
+                           behavior=behavior,
+                           voxel_dims=[-2,0,1],
+                           verbose=verbose )
+
+    for ROI_id,ROI in ROI_output.items():
+        RTNII_outname = nii_output_file if len(ROI_output) == 1 else nii_output_file[:-suffix_length] + "_" + str(ROI_id) + ".nii.gz"
+        RTNII = nib.Nifti1Image(ROI['data'],volume.affine)
+        nib.save(RTNII,RTNII_outname)
+
+    # TODO: Write name of ROI to nii tag if possible.. See rtx_to_mnc.
 
 def hu2lac(infile,outfile,kvp=None,mrac=False,verbose=False):
 
