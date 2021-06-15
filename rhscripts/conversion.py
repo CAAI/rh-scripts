@@ -269,7 +269,7 @@ def to_dcm(np_array,
         if hasattr(ds, 'RescaleSlope'):
             # Calculate new rescale slope if needed
             if forceRescaleSlope or (np.max(data_slice) - ds.RescaleIntercept )/ds.RescaleSlope > _CONSTANTS[data_type]:
-                ds.RescaleSlope = ( np.max(np_array)-ds.RescaleIntercept + 0.000000000001 ) / float(_CONSTANTS[data_type])
+                ds.RescaleSlope = ( np.max(np_array)-ds.RescaleIntercept + 0.1 ) / float(_CONSTANTS[data_type])
                 if verbose:
                     print(f"Setting RescaleSlope to {ds.RescaleSlope}")
 
