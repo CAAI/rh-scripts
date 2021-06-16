@@ -781,6 +781,7 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
 
             data = np.zeros(img_size)
             contour_sequences = ROI.ContourSequence
+            contour_points = {}
 
             if verbose:
                 print(" --> Found",len(contour_sequences),"contour sequences for ROI:",RTSS.StructureSetROISequence[ROI_id].ROIName)
@@ -806,6 +807,11 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                         current_slice_i = img_size[0]-current_slice_i-1
                     voxel_coordinates_inplane[wi,:] = [voxel[voxel_dims[1]],voxel[voxel_dims[2]]]
 
+                    # Track the contour points as well in float
+                    if wi == 0:
+                        contour_points[int(round(current_slice_i))] = []
+                    contour_points[int(round(current_slice_i))].append([voxel[voxel_dims[1]],voxel[voxel_dims[2]]])
+
                 current_slice_inner = np.zeros((img_size[1],img_size[2]),dtype=np.float32)
                 if behavior == 'default':
                     # Locate each voxel covered by, or located inside, a polygon contour
@@ -817,7 +823,7 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                         for y in range( img_size[2] ):
                             current_slice_inner[ x, y ] = cv2.pointPolygonTest(
                                     np.array( [voxel_coordinates_inplane], dtype='float32' ),
-                                    (y+0.5,x+0.5),
+                                    (y,x),
                                     False
                             )
                     current_slice_inner = (current_slice_inner>0).astype('uint8')
@@ -827,7 +833,8 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
             data[data % 2 == 0] = 0
 
             ROI_output[ROI_id] = {'ROIname': RTSS.StructureSetROISequence[ROI_id].ROIName,
-                                  'data': data}
+                                  'data': data,
+                                  'contour_points': contour_points}
         return ROI_output
     except InvalidDicomError:
         print("Could not read DICOM RTX file", dcmfile)
