@@ -808,7 +808,7 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                     voxel_coordinates_inplane[wi,:] = [voxel[voxel_dims[1]],voxel[voxel_dims[2]]]
 
                     # Track the contour points as well in float
-                    if wi == 0:
+                    if wi == 0 and not int(round(current_slice_i)) in contour_points:
                         contour_points[int(round(current_slice_i))] = []
                     contour_points[int(round(current_slice_i))].append([voxel[voxel_dims[1]],voxel[voxel_dims[2]]])
 
