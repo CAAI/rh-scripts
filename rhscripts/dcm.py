@@ -823,7 +823,7 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                         for y in range( img_size[2] ):
                             current_slice_inner[ x, y ] = cv2.pointPolygonTest(
                                     np.array( [voxel_coordinates_inplane], dtype='float32' ),
-                                    (y,x),
+                                    (y,x), # Not sure if should be swapped, or needs a 0.5 voxel offset for center?
                                     False
                             )
                     current_slice_inner = (current_slice_inner>0).astype('uint8')
