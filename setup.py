@@ -20,6 +20,7 @@ setup(
              'dicom/replace_dicom_container.py',
              'conversion/dicom_to_minc.py',
   	    	 'conversion/rtx2mnc.py',
+             'conversion/rtx2nii.py',
   	    	 'conversion/mnc2dcm.py',
              'conversion/nii2dcm.py',
   	    	 'conversion/rtdose2mnc.py',
@@ -35,7 +36,8 @@ setup(
          'matplotlib',
          'pandas',
          'nipype',
-         'scikit-image'
+         'scikit-image',
+         'nibabel'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',
