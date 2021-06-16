@@ -12,10 +12,10 @@ __version__ = '0.0.1'
 # VERSIONS:
 #  - 0.0.1 :: 2021-06-15 : Added script as a copy of rtx2mnc
 
-parser = argparse.ArgumentParser(description='RTX2MNC.')
+parser = argparse.ArgumentParser(description='RTX2NII.')
 parser.add_argument('RTX', help='Path to the DICOM RTX file', nargs='?')
-parser.add_argument('container', help='Path to the MINC container file', nargs='?')
-parser.add_argument('output', help='Path to the OUTPUT MINC RT file', nargs='?')
+parser.add_argument('container', help='Path to the Nifty container file', nargs='?')
+parser.add_argument('output', help='Path to the OUTPUT Nifty RT file', nargs='?')
 parser.add_argument('--behavior', help='Choose how to convert to polygon. Options: default, mirada',type=str,default='default')
 parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
 #parser.add_argument("--copy_name", help="Copy the name of the RTstruct (defined in Mirada) to the tag dicom_0x0008:el_0x103e of the MNC file", action="store_true")
