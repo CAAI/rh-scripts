@@ -3,6 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from typing import Union
 
 _PETRainbowCMAP = matplotlib.colors.LinearSegmentedColormap(
     'PET-Rainbow',
@@ -90,26 +91,34 @@ def _contours_mask_slice(slice: np.ndarray,thickness: int=2, contour_position_ou
         slice = np.logical_not(slice)
     return np.logical_not(np.logical_and(slice, mask))
 
-def plot_img_and_mask( img,
-                       mask,
-                       ax=None,
+def plot_img_and_mask( img: np.ndarray,
+                       mask: np.ndarray,
+                       ax: plt.Axes=None,
                        # Image related arguments
-                       vmin=None,
-                       vmax=None,
-                       cmap=_PETRainbowCMAP,
+                       vmin: float=None,
+                       vmax: float=None,
+                       cmap: Union[str,matplotlib.colors.Colormap]=_PETRainbowCMAP,
                        # Contour related arguments
-                       line_color='r',
-                       line_thickness=2,
-                       overlay_mask=False,
-                       contour_position_outside=True):
+                       line_color: str='r',
+                       line_thickness: int=2,
+                       overlay_mask: bool=False,
+                       contour_position_outside: bool=True,
+                       mask_alpha: float=0.3):
+    """
+    Plot an image slice and and associated binary mask image as a contour.
+    The image and mask must be 2D.
+    The color of the line, the tickness, position relative to the mask contour can
+    be defined, as well as weather the mask should be displayed with an alpha value.
+    """
     if ax is None:
         fig, ax = plt.subplots()
 
     ax.imshow( img, vmin=vmin, vmax=vmax, cmap=cmap )
     if overlay_mask:
         mask_ = mask.copy()
+        # Set transparent background
         mask_[ mask_ < 1 ] = np.nan
-        ax.imshow( mask_, cmap=matplotlib.colors.ListedColormap([line_color]), alpha=0.3 )
+        ax.imshow( mask_, cmap=matplotlib.colors.ListedColormap([line_color]), alpha=mask_alpha )
     plot_mask( img=img,
                mask=mask,
                ax=ax,
@@ -119,12 +128,17 @@ def plot_img_and_mask( img,
              )
     return ax
 
-def plot_mask( img,
-               mask,
-               ax=None,
-               line_color='r',
-               line_thickness=2,
-               contour_position_outside=True):
+def plot_mask( img: np.ndarray,
+               mask: np.ndarray,
+               ax: plt.Axes=None,
+               line_color: str='r',
+               line_thickness: int=2,
+               contour_position_outside: bool=True):
+    """
+    Plot a binary mask image as a contour.
+    The mask must be 2D.
+    The color of the line, the tickness, position relative to the mask contour can be defined.
+    """
     if ax is None:
         fig, ax = plt.subplots()
 
