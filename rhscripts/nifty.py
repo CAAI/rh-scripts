@@ -81,16 +81,12 @@ def iso_resample(in_file, out_file, voxel_size=1.0):
         out_file (a pathlike object or str): Output file
         voxel_size (float): target voxel sixe in mm. Default 1.0
     """
-    resampler = FLIRT()
-    resampler.inputs.in_file = in_file
-    resampler.inputs.reference = in_file
-    resampler.inputs.out_file = out_file
-    resampler.inputs.output_type = "NIFTI_GZ"
-    resampler.inputs.apply_isoxfm = voxel_size
-    try:
-        resampler.run()
-    except Exception as e:
-        print(e)
+    flirt( in_file=in_file,
+           ref_file=in_file,
+           out_file=out_file,
+           output_type='NIFTI_GZ',
+           apply_isoxfm=voxel_size
+          )
 
 def flirt(in_file, ref_file, out_file, **kwargs):
     """Perform resampling or registration using FSL FLIRT
