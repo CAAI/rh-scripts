@@ -1,7 +1,16 @@
-from nipype.interfaces.fsl import Threshold, IsotropicSmooth, RobustFOV, BET, FLIRT, ConvertXFM
+from nipype.interfaces.fsl import (
+    Threshold,
+    IsotropicSmooth,
+    RobustFOV,
+    BET,
+    FLIRT,
+    ConvertXFM,
+    Reorient2Std
+)
 from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths, UnaryMaths
 from nipype.interfaces.niftyreg import RegResample, RegAladin, RegTransform
-
+import typing
+import pathlib
 
 ######################################################################################################
 #################################   Registration utilities   ##########################################
@@ -83,6 +92,32 @@ def iso_resample(in_file, out_file, voxel_size=1.0):
     except Exception as e:
         print(e)
 
+def flirt(in_file, ref_file, out_file, **kwargs):
+    """Perform resampling or registration using FSL FLIRT
+
+    Args:
+        in_file (a pathlike object or str): Input file to be moved
+        ref_file (a pathlike object or str): Target or reference file
+        out_file (a pathlike object or str): Output file
+        kwargs: Arguments to FLIRT, for options see:
+                https://nipype.readthedocs.io/en/0.12.1/interfaces/generated/nipype.interfaces.fsl.preprocess.html#flirt
+
+    Example usage:
+        from rhscripts.nifty import flirt
+        flirt('MRI.nii.gz', 'MNI.nii.gz', 'MRI_rsl.nii.gz', dof=6, interp='spline')
+    """
+    resampler = FLIRT()
+    resampler.inputs.in_file = in_file
+    resampler.inputs.reference = ref_file
+    resampler.inputs.out_file = out_file
+    for key,value in kwargs.items():
+        if hasattr( resampler.inputs, key ):
+            setattr( resampler.inputs, key, value )
+    try:
+        resampler.run()
+    except Exception as e:
+        print(e)
+
 
 ######################################################################################################
 #################################   FSL wrapper utilities   ##########################################
@@ -106,7 +141,7 @@ def apply_mask(in_file, mask_file, out_file):
 
 
 def isotropic_smooth(in_file, out_file, sigma):
-    """Gaussian filter 
+    """Gaussian filter
 
     Args:
         in_file (a pathlike object or str): Input filename.
@@ -221,7 +256,7 @@ def merge_images(in_file1, in_file2, out_file):
     multiplier.inputs.operand_file = in_file2
     multiplier.inputs.out_file = out_file
     multiplier.run()
-    
+
 
 def concat_transforms(in_file1, in_file2, out_file=None):
     """Concatenates two affine transforms.
@@ -231,7 +266,7 @@ def concat_transforms(in_file1, in_file2, out_file=None):
         in_file2 (a pathlike object or str): Affine transform file 2
         out_file (a pathlike object or str, optional): Output filename. Defaults to None (overwrites file 2)
     """
-    
+
     concat = ConvertXFM()
     concat.inputs.in_file = in_file1
     concat.inputs.in_file2 = in_file2
@@ -240,3 +275,16 @@ def concat_transforms(in_file1, in_file2, out_file=None):
         out_file = in_file2   # overwrite file 2
     concat.inputs.out_file = out_file
     concat.run()
+
+def reorient_to_std(in_file: typing.Union[str, pathlib.Path], out_file: typing.Union[str, pathlib.Path]):
+    """Reorient orientation to match standard template images (MNI152)
+
+    Args:
+        in_file (a pathlike object or str): Input filename
+        out_file (a pathlike object or str): Output filename
+    """
+
+    reorient = Reorient2Std()
+    reorient.inputs.in_file = in_file
+    reorient.inputs.out_file = out_file
+    res = reorient.run()
