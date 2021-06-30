@@ -115,7 +115,7 @@ def plot_img_and_mask( img: np.ndarray,
 
     ax.imshow( img, vmin=vmin, vmax=vmax, cmap=cmap )
     if overlay_mask:
-        mask_ = mask.copy()
+        mask_ = mask.copy().astype(np.float32)
         # Set transparent background
         mask_[ mask_ < 1 ] = np.nan
         ax.imshow( mask_, cmap=matplotlib.colors.ListedColormap([line_color]), alpha=mask_alpha )
