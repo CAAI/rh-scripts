@@ -1,4 +1,4 @@
-__version__ = '0.1.9'
+__version__ = '0.1.10'
 git_revision = ''
 
 """
@@ -26,6 +26,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.1.7 # Added nifty_to_dcm. Function merged with mnc_to_dcm* into to_dcm
   0.1.8 # Fixed RescaleSlope and RescaleIntercept, incl moving them in pr slice rather than global
   0.1.9 # Added to_rtx and read_rtx
+  0.1.10 # Added hd_bet to nifti, fixed bugs in plotting and dcm.
 """
 
 def __show_version__():
