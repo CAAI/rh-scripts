@@ -11,6 +11,7 @@ from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths, UnaryMaths
 from nipype.interfaces.niftyreg import RegResample, RegAladin, RegTransform
 import typing
 import pathlib
+import os
 
 ######################################################################################################
 #################################   Registration utilities   ##########################################
@@ -34,8 +35,8 @@ def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN', pad_va
     rsl.inputs.flo_file = flo_file
     rsl.inputs.trans_file = trans_file
     rsl.inputs.inter_val = interpol
-    if pad_val:
-        rsl.inputs.pad_val = 0.0
+    if pad_val is not None:
+        rsl.inputs.pad_val = pad_val
     rsl.inputs.out_file = out_file
     rsl.run()
 
@@ -188,7 +189,7 @@ def robust_fov(in_file, out_roi, out_transform):
     crop.run()
 
 
-def skull_strip(in_file, out_file, frac, mask=True):
+def skull_strip(in_file, out_file, frac=0.5, mask=True):
     """Brain extraction routine for skull stripping
 
     Args:
@@ -203,6 +204,39 @@ def skull_strip(in_file, out_file, frac, mask=True):
     bet.inputs.frac = frac
     bet.inputs.out_file = out_file
     bet.run()
+
+
+def hd_bet(input:typing.Union[str,pathlib.Path],
+           output:typing.Union[str,pathlib.Path]=None,
+           mask:bool=True,
+           input_type:str='MR'):
+    """GPU-based BET
+
+    Args:
+        input (a pathlike object or str): Input filename or folder
+                                          When folder, all .nii.gz files will
+                                          be processed
+        output (a pathlike object or str): Output filename or folder.
+                                           When None, output will be
+                                           <input>_BET and <input>_BET_mask
+        mask (bool, optional): Create binary mask image. Defaults to True.
+        input_type (str: optional): Chose MR or CT input.
+    """
+    if input_type not in ('MR','MRI','CT'):
+        raise ValueError('Unknown method')
+
+    if input_type in ('MR','MRI'):
+        cmd = 'hd-bet'
+    elif input_type == 'CT':
+        cmd = 'hd-bet-ct'
+        raise ValueError('Method not yet implemented')
+
+    cmd += f' -i {input}'
+    if not mask:
+        cmd += ' -s 0'
+    if output is not None:
+        cmd += f' -o {output}'
+    os.system(cmd)
 
 
 def rescale(in_file, out_file, operand_value):
