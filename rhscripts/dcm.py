@@ -394,7 +394,7 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
     """
 
     def sort_files(p):
-        return {dicom.read_file(str(d)).InstanceNumber : d for d in Path(p).iterdir() }
+        return {dcmread(str(d)).InstanceNumber : d for d in Path(p).iterdir() if not d.name.startswith('.') }
 
     # Get dictionary with key=InstanceNumber val=Path-object for the file
     d_new = sort_files(in_folder)
@@ -405,11 +405,15 @@ def replace_container(in_folder: str, container: str, out_folder: str, SeriesNum
 
     seriesInstanceUID = generate_SeriesInstanceUID()
 
-    # For each slice, 1-indexed due to InstanceNumber key
-    for i in range(1,len(d_new)+1):
+    # For each slice
+    # Check start of instance numbers
+    assert min(d_new.keys()) == min(d_container.keys())
+    assert max(d_new.keys()) == max(d_container.keys())
+    assert len(d_new) == len(d_container)
+    for i in d_new.keys():
 
-        ds_container=dicom.read_file(str(d_container[i]))
-        ds_new=dicom.read_file(str(d_new[i]))
+        ds_container=dcmread(str(d_container[i]))
+        ds_new=dcmread(str(d_new[i]))
 
         ds_container.PixelData = ds_new.PixelData
 
