@@ -18,7 +18,8 @@ import os
 ######################################################################################################
 
 
-def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN', pad_val=None):
+def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN',
+                 pad_val=None, verbosity=None):
     """Resample nifty file to a reference template given a transformation matrix
 
     Args:
@@ -28,6 +29,14 @@ def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN', pad_va
         out_file (a pathlike object or str): The output filename of the transformed image
         interpol (‘NN’ or ‘LIN’ or ‘CUB’ or ‘SINC’): Type of interpolation. Defaults to 'NN'.
         pad_val (float, optional): Padding value to pad. Defaults to None.
+        verbosity (None or str): One of file, file_split, file_stdout,
+                                 file_stderr, stream, allatonce, none
+
+    Returns:
+        Runtime object (except for verbosity='none').
+        Access errors by e.g.:
+            result = reg_resample(...,verbosity='file_stdout')
+            result.runtime.stdout
     """
 
     rsl = RegResample()
@@ -38,10 +47,18 @@ def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN', pad_va
     if pad_val is not None:
         rsl.inputs.pad_val = pad_val
     rsl.inputs.out_file = out_file
-    rsl.run()
+
+    if verbosity is not None:
+        if verbosity not in ('file', 'file_split', 'file_stdout',
+                             'file_stderr', 'stream', 'allatonce', 'none'):
+            raise ValueError('Verbosity of a nipype function must be one of '
+                             'the specified.')
+        rsl.terminal_output = verbosity
+
+    return rsl.run()
 
 
-def reg_aladin(ref_file, flo_file, aff_file, res_file=None):
+def reg_aladin(ref_file, flo_file, aff_file, res_file=None, verbosity=None):
     """Block Matching algorithm for symmetric global registration
 
     Args:
@@ -49,6 +66,14 @@ def reg_aladin(ref_file, flo_file, aff_file, res_file=None):
         flo_file (a pathlike object or str): The input floating/source image
         aff_file (a pathlike object or str): The output affine matrix file
         res_file (a pathlike object or str): The affine transformed floating image
+        verbosity (None or str): One of file, file_split, file_stdout,
+                                 file_stderr, stream, allatonce, none
+
+    Returns:
+        Runtime object (except for verbosity='none').
+        Access errors by e.g.:
+            result = reg_aladin(...,verbosity='file_stdout')
+            result.runtime.stdout
     """
 
     ral = RegAladin()
@@ -57,7 +82,13 @@ def reg_aladin(ref_file, flo_file, aff_file, res_file=None):
     if res_file:
         ral.inputs.res_file = res_file
     ral.inputs.aff_file = aff_file
-    ral.run()
+    if verbosity is not None:
+        if verbosity not in ('file', 'file_split', 'file_stdout',
+                             'file_stderr', 'stream', 'allatonce', 'none'):
+            raise ValueError('Verbosity of a nipype function must be one of '
+                             'the specified.')
+        ral.terminal_output = verbosity
+    return ral.run()
 
 
 def inv_affine(inv_aff_input, out_file):
