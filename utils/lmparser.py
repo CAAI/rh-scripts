@@ -58,6 +58,7 @@ parser.add_argument("--seed", help='Seed value for random', default=11, type=int
 parser.add_argument("--out_dicom", help='Save DICOM header to file', type=str)
 parser.add_argument('--anonymize', action='store_true')
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+parser.add_argument("-s", "--scaling", help="delay scaling type: linear/quadratic", type = str)
 args = parser.parse_args()
 
 parser = LMParser( ptd_file = args.ptd_file,  out_folder = args.out_folder, 

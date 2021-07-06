@@ -65,11 +65,13 @@ class LMParser:
         self.__open_ptd_file()
         self.__read_dicom_header()        
         
-    def chop( self, retain: int=None, out_filename: str=None, seed: int=11 ):
+    def chop( self, retain: int=None, out_filename: str=None, seed: int=11, scaling='linear'):
         # Input args
         self.do_chop = True
         self.out_filename = out_filename
         self.retain = retain
+        # Delay scaling
+        self.scaling = scaling
         self.seed = seed
         # Open OutFile for writing
         self.OutFile = open( self.__generate_output_name() ,'wb')
@@ -92,19 +94,27 @@ class LMParser:
                         self.__print(f"Finished {listms/1000} seconds")
             else:
                 self.EVENT_WORD += 1
-                
-                """ FROM HERE YOU CAN IMPLEMENT THE PROMPT / DELAY RETAIN DIFFERENCE LOGIC """
+
                 if int_word >> 30 == 0x1: 
                     self.PROMPT += 1 
                 else: 
                     self.DELAY += 1
                 """ END PROMPT/DELAY """
                 
-                if random.random() < retain_fraction:
-                    self.OutFile.write(word)
-                    self.KEEP += 1
+                r_ = random.random()
+                # Rb82 tracer
+                if scaling == "quadratic":
+                    if (int_word >> 30 == 0x1 and r_ < retain_fraction) or (r_ < retain_fraction**2):
+                        self.OutFile.write(word)
+                        self.KEEP += 1
+                    else:
+                        self.TOSS += 1
                 else:
-                    self.TOSS += 1
+                    if r_ < retain_fraction:
+                        self.OutFile.write(word)
+                        self.KEEP += 1
+                    else:
+                        self.TOSS += 1
         self.__print("Done parsing LM words")
         self.__print(f"Prompts: {self.PROMPT}\nDelays: {self.DELAY}")
         self.__print(f"TAGS: {self.TAG_WORD}\nEVENTS: {self.EVENT_WORD}")
