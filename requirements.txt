@@ -3,3 +3,6 @@ matplotlib
 pydicom
 pyminc
 opencv-python
+pandas
+nipype
+scikit-image

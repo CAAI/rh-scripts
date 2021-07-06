@@ -5,6 +5,15 @@ import os, sys, glob
 import pydicom as dicom
 import datetime
 from rhscripts.dcm import Anonymize
+
+__scriptname__ = 'anonymize_dicom'
+__version__ = '0.0.1'
+
+"""
+VERSIONING
+  0.0.1 # Created script
+"""
+
 """
 
 Date: 1/6-2018

@@ -10,7 +10,7 @@ Some scripts require python3.8+.
 Install only to your user. Go to your virtual environment. Run:
 ```
 git clone https://github.com/CAAI/rh-scripts.git && cd rh-scripts
-pip install -e .
+pip install .
 ```
 
 ### Using Cmake
@@ -36,7 +36,12 @@ Create the folder if it does not exists. After this, modify the tags needed in t
 
 
 ## CHECK INSTALLATION
-Perform unittest for python scripts.
+Perform unittest for python scripts (after installing).
+After installing with pip:
+```
+python -m unittest discover -s tests -v
+```
+After installing with CMake:
 ```
 python -m unittest discover -s /opt/caai/tests -v
 ```

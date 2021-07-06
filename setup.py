@@ -5,9 +5,9 @@ from rhscripts.version import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-    
+
 setup(
-     name='rhscripts',  
+     name='rhscripts',
      version=__version__,
      author="Claes Ladefoged",
      author_email="claes.noehr.ladefoged@regionh.dk",
@@ -17,9 +17,12 @@ setup(
      url="https://github.com/CAAI/rh-scripts",
      scripts=[
              'dicom/anonymize_dicom.py',
+             'dicom/replace_dicom_container.py',
              'conversion/dicom_to_minc.py',
   	    	 'conversion/rtx2mnc.py',
+             'conversion/rtx2nii.py',
   	    	 'conversion/mnc2dcm.py',
+             'conversion/nii2dcm.py',
   	    	 'conversion/rtdose2mnc.py',
   	    	 'conversion/hu2lac.py',
           	 'conversion/lac2hu.py',
@@ -30,7 +33,11 @@ setup(
          'pyminc',
          'pydicom',
          'opencv-python',
-         'matplotlib'
+         'matplotlib',
+         'pandas',
+         'nipype',
+         'scikit-image',
+         'nibabel'
     ],
     classifiers=[
         'Programming Language :: Python :: 3.8',

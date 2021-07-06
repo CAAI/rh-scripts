@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import sys, random, typing, time, pydicom
 from pathlib import Path
+import pandas as pd
 
 def listdir_nohidden(path):
     """List dir without hidden files
@@ -53,7 +54,7 @@ class LMParser:
         self.filename = Path( ptd_file )
         self.out_folder = Path(out_folder if out_folder is not None else self.filename.parent)
         self.out_folder.mkdir(parents=True,exist_ok=True)
-        self.anonymize = anonymize # NOT YET IMPLEMENTED..
+        self.anonymize = anonymize
         self.verbose = verbose
         # Globals
         self.BytesReady = 0
@@ -123,6 +124,39 @@ class LMParser:
         # Write DICOM header etc back to file
         self.__write_header()
         
+    def return_LM_statistics( self ) -> pd.DataFrame:
+        # Setup LM file
+        self.__prepare_lm_file()
+        
+        dict_prompts = {0:0}
+        dict_delays = {0:0}
+        timestamp = 0
+        for word in self.__read_list():
+            int_word = int.from_bytes(word,byteorder='little')
+            if (int_word & 0x80000000) == 0x80000000:
+                # TAG WORD
+                if (int_word >> 28 & 0xe) == 0x8:
+                    if (listms := int_word & 0x1fffffff) > 0 and listms % 1000 == 0:
+                        timestamp = listms/1000
+                        dict_prompts[timestamp] = 0 
+                        dict_delays[timestamp] = 0 
+                        self.__print(f"Finished {listms/1000} seconds")
+            else:
+                # EVENT WORD
+                
+                if int_word >> 30 == 0x1: 
+                    dict_prompts[timestamp] += 1
+                else: 
+                    dict_delays[timestamp] += 1 
+        df = pd.DataFrame(columns=['t','type','count'])
+        for k,v in dict_prompts.items():
+            df = df.append({'t': k, 'type':'prompt','numEvents':v},ignore_index=True)
+            df = df.append({'t': k, 'type':'delay', 'numEvents':dict_delays[k]},ignore_index=True)
+        df.t = df.t.astype('float')
+        df.numEvents = df.numEvents.astype('int')
+        self.__print("Done parsing LM words")
+        return df
+        
     def close( self ):
         self.LMFile.close()
         if self.do_chop:
@@ -130,8 +164,20 @@ class LMParser:
         self.__print("Closed files")
         self.__print("Done parsing in {:.0f} seconds".format( time.time()-self.start_time))
         
-    def return_converted_dicom_header( self ) -> pydicom.dataset.FileDataset:
-        return pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) ) 
+    def return_converted_dicom_header( self, anonymize_id: str=None, studyInstanceUID: str=None, 
+                                       seriesInstanceUID: str=None, replaceUIDs: bool=False ) -> pydicom.dataset.FileDataset:
+        """
+        Return the DICOM header from the PTD file.
+        """
+        ds = pydicom.dcmread( pydicom.filebase.DicomBytesIO( self.DicomBuffer ) )
+        if self.anonymize:
+            from rhscripts.dcm import Anonymize
+            anon = Anonymize()
+            ds = anon.anonymize_dataset(ds, new_person_name=anonymize_id, 
+                                        studyInstanceUID=studyInstanceUID, 
+                                        seriesInstanceUID=seriesInstanceUID, 
+                                        replaceUIDs=replaceUIDs)
+        return ds 
     
     # Extract DICOM header tag (0029,1008)
     def get_type_from_dicom( self ) -> str:
@@ -169,7 +215,7 @@ class LMParser:
         self.__set_relative_to_end( self.LMDataIDLen ) 
         if not (PTDtype := self.LMFile.read(self.LMDataIDLen).decode('utf-8')) == self.LMDataID:
             sys.exit(f'String {PTDtype} does not match {self.LMDataID}')
-        self.__print(f"PTD file is {self.LMDataID}")
+        self.__print(f"PTD file is {PTDtype}")
         
     def __prepare_lm_file( self ):                    
         # Rewind and prepare for reading
