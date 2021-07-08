@@ -260,6 +260,8 @@ def to_dcm(np_array,
         elif from_type == 'nifty' and not is_4D:
             assert ds.pixel_array.shape == (np_array.shape[0],np_array.shape[1])
             data_slice = np.flip(np_array[:, :, -(i+1)].T, 0).astype('double')
+            # Above is hardcoded - but does not always work. Needs editing!
+            #data_slice = np_array[:, :, i].astype('double')
         elif from_type == 'nifty' and is_4D:
             sys.exit('Nifty 4D conversion not yet implemented')
         else:
@@ -667,20 +669,22 @@ def rtx_to_nii(dcmfile,
     volume = nib.load(nii_container_file)
 
     # Flip to axial-first orientation (assuming axial last)
-    data = np.swapaxes(volume.get_fdata(), 0, 2)
-    data = np.flip(volume, 0)
+    data = volume.get_fdata()
+    data = np.swapaxes(data, 0, 2)
 
     # Read RTX file. Returns dict of dict with outer key=ROI_index and inner_keys "ROIname" and "data"
     ROI_output = read_rtx( dcmfile=dcmfile,
                            img_size=data.shape,
                            fn_world_to_voxel=lambda x: nib.affines.apply_affine(aff=np.linalg.inv(volume.affine),pts=x),
                            behavior=behavior,
-                           voxel_dims=[-2,0,1],
+                           voxel_dims=[2,0,1],
                            verbose=verbose )
 
     for ROI_id,ROI in ROI_output.items():
+        # Swap back to axial last
+        ROI_data = np.swapaxes(ROI['data'], 2, 0)
         RTNII_outname = nii_output_file if len(ROI_output) == 1 else nii_output_file[:-suffix_length] + "_" + str(ROI_id) + ".nii.gz"
-        RTNII = nib.Nifti1Image(ROI['data'],volume.affine)
+        RTNII = nib.Nifti1Image(ROI_data,volume.affine)
         nib.save(RTNII,RTNII_outname)
 
     # TODO: Write name of ROI to nii tag if possible.. See rtx_to_mnc.
