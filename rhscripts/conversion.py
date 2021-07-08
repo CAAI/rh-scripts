@@ -13,7 +13,8 @@ from rhscripts.dcm import (
     generate_SeriesInstanceUID,
     generate_SOPInstanceUID,
     to_rtx,
-    read_rtx
+    read_rtx,
+    get_sort_files_dict
 )
 from rhscripts.version import __version__
 import datetime
@@ -181,7 +182,8 @@ def to_dcm(np_array,
     forceRescaleSlope : boolean, optional
         Forces recalculation of rescale slope
     from_type : str, optional
-        Used to determine how to read the input array, options: 'minc','nifty'
+        Used to determine how to read the input array, options:
+            'minc','nifty','torchio'
 
     Examples
     --------
@@ -211,7 +213,8 @@ def to_dcm(np_array,
         dcmcontainer = Path(dcmcontainer)
 
     # gather the dicom slices from the container
-    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
+    # return a dict with keys={0..#slices -1}, values=Path to dcm file
+    dcm_slices = get_sort_files_dict(dcmcontainer)
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
@@ -230,7 +233,7 @@ def to_dcm(np_array,
         totalSlicesInArray = np_array.shape[0]
     if from_type == 'nifty' and is_4D:
         sys.exit('Nifty 4D conversion not yet implemented')
-    if from_type == 'nifty' and not is_4D:
+    if (from_type == 'nifty' or from_type == 'torchio') and not is_4D:
         totalSlicesInArray = np_array.shape[2]
 
     if verbose:
@@ -246,9 +249,12 @@ def to_dcm(np_array,
     dicomfolder.mkdir(parents=True, exist_ok=True)
 
     # List files, do not need to be ordered
-    for f in dcm_slices:
+    for SliceNumber, f in dcm_slices.items():
         ds = dcmread(f)
-        i = int(ds.InstanceNumber)-1
+        # Sometimes this needs to be flipped,
+        # e.g. max(dcm_slices.keys())-SliceNumber-1 (or similar).
+        # This should be triggered by a dicom tag somewhere.
+        i = int(SliceNumber)
 
         # Get single slice
         if from_type == 'minc' and is_4D:
@@ -260,8 +266,8 @@ def to_dcm(np_array,
         elif from_type == 'nifty' and not is_4D:
             assert ds.pixel_array.shape == (np_array.shape[0],np_array.shape[1])
             data_slice = np.flip(np_array[:, :, -(i+1)].T, 0).astype('double')
-            # Above is hardcoded - but does not always work. Needs editing!
-            #data_slice = np_array[:, :, i].astype('double')
+        elif from_type == 'torchio' and not is_4D:
+            data_slice = np_array[:, :, i].astype('double')
         elif from_type == 'nifty' and is_4D:
             sys.exit('Nifty 4D conversion not yet implemented')
         else:
@@ -311,9 +317,6 @@ def to_dcm(np_array,
 
             # Update SOP - unique per file
             ds.SOPInstanceUID = generate_SOPInstanceUID(i+1)
-
-            # Update MediaStorageSOPInstanceUID - unique per file
-            #ds.file_meta.MediaStorageSOPInstanceUID = newMSOP # Not needed anymore?
 
             # Same for all files
             ds.SeriesInstanceUID = newSIUID
