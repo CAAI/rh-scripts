@@ -6,6 +6,7 @@ import numpy as np
 import sys, random, typing, time, pydicom
 from pathlib import Path
 import pandas as pd
+from math import sqrt
 
 def listdir_nohidden(path):
     """List dir without hidden files
@@ -105,7 +106,7 @@ class LMParser:
                 r_ = random.random()
                 # Rb82 tracer
                 if scaling == "quadratic":
-                    if (int_word >> 30 == 0x1 and r_ < retain_fraction) or (r_ < retain_fraction**2):
+                    if (int_word >> 30 == 0x1 and r_ < retain_fraction) or (r_ < sqrt(retain_fraction)):
                         self.OutFile.write(word)
                         self.KEEP += 1
                     else:
@@ -142,16 +143,19 @@ class LMParser:
                         dict_delays[timestamp] = 0 
                         self.__print(f"Finished {listms/1000} seconds")
             else:
-                # EVENT WORD
+                # Number of events
+                # dict_events[timestamp] += 1
                 
                 if int_word >> 30 == 0x1: 
                     dict_prompts[timestamp] += 1
                 else: 
                     dict_delays[timestamp] += 1 
+
         df = pd.DataFrame(columns=['t','type','count'])
         for k,v in dict_prompts.items():
             df = df.append({'t': k, 'type':'prompt','numEvents':v},ignore_index=True)
             df = df.append({'t': k, 'type':'delay', 'numEvents':dict_delays[k]},ignore_index=True)
+            # df = df.append({'t': k, 'type':'events', 'numEvents':v+dict_delays[k]},ignore_index=True)
         df.t = df.t.astype('float')
         df.numEvents = df.numEvents.astype('int')
         self.__print("Done parsing LM words")
