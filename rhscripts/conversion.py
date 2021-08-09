@@ -338,7 +338,8 @@ def mnc_to_dcm(mncfile,
                forceRescaleSlope=False,
                zero_clamp=False,
                clamp_lower: int=None,
-               clamp_upper: int=None):
+               clamp_upper: int=None,
+               flip: bool=False):
     """Convert a minc file to dicom
 
     Parameters
@@ -366,6 +367,8 @@ def mnc_to_dcm(mncfile,
         Force a lower bound on the input data
     clamp_upper : int, optional
         Force an upper bound on the input data
+    flip : boolean, optional
+        If set, the x-axis will be flipped
 
     Examples
     --------
@@ -388,6 +391,9 @@ def mnc_to_dcm(mncfile,
         np_minc = np.maximum( np_minc, clamp_lower )
     if clamp_upper is not None:
         np_minc = np.minimum( np_minc, clamp_upper )
+
+    if flip:
+        np_minc = np.flip(np_minc, axis=0)
 
     to_dcm(np_array=np_minc,
            dicomcontainer=dicomcontainer,
