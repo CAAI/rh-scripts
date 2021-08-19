@@ -58,4 +58,4 @@ nii_to_rtx( niifile=args.nifty_file,
             dcmcontainer=args.dicom_container,
             out_folder=args.dicom_output,
             out_filename=args.out_filename,
-            verbose=args.verbose):
+            verbose=args.verbose)

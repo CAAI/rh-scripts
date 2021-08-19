@@ -11,11 +11,15 @@ ADD_SUBDIRECTORY( rhscripts )
 
 # Install programs into bin
 INSTALL(PROGRAMS conversion/dicom_to_minc.py
-	conversion/rtx2mnc.py
-	conversion/mnc2dcm.py
-	conversion/rtdose2mnc.py
 	conversion/hu2lac.py
 	conversion/lac2hu.py
+	conversion/mnc2dcm.py
+	conversion/mnc2rtx.py
+	conversion/nii2dcm.py
+	conversion/nii2rtx.py
+	conversion/rtdose2mnc.py
+	conversion/rtx2mnc.py
+	conversion/rtx2nii.py
 	dicom/anonymize_dicom.py
   PERMISSIONS
     OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ  WORLD_EXECUTE WORLD_READ
