@@ -58,4 +58,4 @@ mnc_to_rtx( mncfile=args.minc_file,
             dcmcontainer=args.dicom_container,
             out_folder=args.dicom_output,
             out_filename=args.out_filename,
-            verbose=args.verbose):
+            verbose=args.verbose)
