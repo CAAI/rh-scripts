@@ -19,16 +19,18 @@ setup(
              'dicom/anonymize_dicom.py',
              'dicom/replace_dicom_container.py',
              'conversion/dicom_to_minc.py',
-  	    	 'conversion/rtx2mnc.py',
+             'conversion/rtx2mnc.py',
              'conversion/rtx2nii.py',
-  	    	 'conversion/mnc2dcm.py',
+             'conversion/mnc2rtx.py',
+             'conversion/nii2rtx.py',
+             'conversion/mnc2dcm.py',
              'conversion/nii2dcm.py',
-  	    	 'conversion/rtdose2mnc.py',
-  	    	 'conversion/hu2lac.py',
-          	 'conversion/lac2hu.py',
+             'conversion/rtdose2mnc.py',
+             'conversion/hu2lac.py',
+             'conversion/lac2hu.py',
              'utils/lmparser.py'
-    ],
-     packages=setuptools.find_packages(),
+     ],
+     packages=find_packages(),
      install_requires=[
          'pyminc',
          'pydicom',
@@ -38,8 +40,8 @@ setup(
          'nipype',
          'scikit-image',
          'nibabel'
-    ],
-    classifiers=[
-        'Programming Language :: Python :: 3.8',
-    ],
+     ],
+     classifiers=[
+         'Programming Language :: Python :: 3.8',
+     ],
  )

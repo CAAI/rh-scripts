@@ -27,6 +27,7 @@ VERSIONING (UPDATED WHEN ADDING TO MASTER BRANCH)
   0.1.8 # Fixed RescaleSlope and RescaleIntercept, incl moving them in pr slice rather than global
   0.1.9 # Added to_rtx and read_rtx
   0.1.10 # Added hd_bet to nifti, fixed bugs in plotting and dcm.
+         # Removed CMAKE as install option.
 """
 
 def __show_version__():
