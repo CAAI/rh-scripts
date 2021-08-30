@@ -198,8 +198,10 @@ class Anonymize:
         # Check for replaceUIDs:
         if replaceUIDs:
             if studyInstanceUID is None:
-            	studyInstanceUID = generate_StudyInstanceUID()
+                studyInstanceUID = generate_StudyInstanceUID()
             seriesInstanceUID = generate_SeriesInstanceUID()
+        else:
+            seriesInstanceUID = None  # Default when not overwriting
 
         for fid,filename in enumerate(os.listdir(foldername)):
             ending = '.dcm' if os.path.splitext(filename)[1]=='' else os.path.splitext(filename)[1]
