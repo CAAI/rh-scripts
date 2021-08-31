@@ -159,7 +159,7 @@ class Anonymize:
     def anonymize_folder(self,foldername: str,output_foldername: str,
                          new_person_name: str="anonymous", overwrite_ending: bool=False,
                          ending_suffix: str='.dcm', studyInstanceUID: str=None,
-                         replaceUIDs: bool=False):
+                         replaceUIDs: bool=False) -> str:
         """ Function to anonymize all files in the folder and subfolders.
 
         Parameters
@@ -217,7 +217,9 @@ class Anonymize:
             else:
                 if self.verbose:
                     print("Found",filename,"\r")
-                self.anonymize_folder(os.path.join(foldername, filename),os.path.join(output_foldername, filename),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
+                self.anonymize_folder(os.path.join(foldername, filename),os.path.join(output_foldername, filename),new_person_name,studyInstanceUID=studyInstanceUID,replaceUIDs=replaceUIDs)
+
+        return studyInstanceUID
 
 """ ANONYMIZE END """
 
