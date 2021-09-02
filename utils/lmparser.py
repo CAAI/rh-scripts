@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from rhscripts.utils import LMParser
+from rhscripts.utils import LMParser, ParseBoolean
 import argparse
 
 __scriptname__ = 'lmparser'
@@ -50,7 +50,7 @@ Date: 11-04-2021
 
 # INPUTS
 parser = argparse.ArgumentParser()
-parser.add_argument("ptd_file", help='Input PTD LLM file', type=str)
+parser.add_argument("--ptd_file", help='Input PTD LLM file', type=str)
 parser.add_argument("--retain", help='Percent (float) of LMM events to retain (0-100)', type=float)
 parser.add_argument("--out_folder", help='Output folder for chopped PTD LLM file(s)', type=str)
 parser.add_argument("--out_filename", help='Output filename for chopped PTD LLM file', type=str)
@@ -58,12 +58,12 @@ parser.add_argument("--seed", help='Seed value for random', default=11, type=int
 parser.add_argument("--out_dicom", help='Save DICOM header to file', type=str)
 parser.add_argument('--anonymize', action='store_true')
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-parser.add_argument("-s", "--scaling", help="delay scaling type: linear/quadratic", type = str)
+parser.add_argument("--rb82", help="delay scaling type: False == linear/ True == quadratic", type = ParseBoolean)
 args = parser.parse_args()
 
 parser = LMParser( ptd_file = args.ptd_file,  out_folder = args.out_folder, 
                    anonymize = args.anonymize, verbose = args.verbose)
-if args.retain: parser.chop(retain = args.retain, out_filename = args.out_filename, seed = args.seed)
+if args.retain: parser.chop(retain = args.retain, out_filename = args.out_filename, seed = args.seed, rb82 = args.rb82)
 if args.out_dicom: parser.save_dicom(args.out_dicom)
 parser.close()
     
