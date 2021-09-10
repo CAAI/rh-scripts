@@ -32,6 +32,16 @@ def bbox_ND(img):
         out.extend(np.where(nonzero)[0][[0, -1]])
     return tuple(out)
 
+# Boolean parse check for input args
+def ParseBoolean(b):
+    b = b.lower()
+    if b == 'true':
+        return True
+    elif b == 'false':
+        return False
+    else:
+        raise ValueError('Cannot parse string into boolean.')
+        
 class LMParser:
     """ LMParser 
     
@@ -44,7 +54,7 @@ class LMParser:
         parser.close()
     
     """
-    def __init__( self, ptd_file: str, out_folder: str=None, anonymize: bool=False, verbose: bool=False ):
+    def __init__( self, ptd_file: str, out_folder: str=None, anonymize: bool=False, verbose: bool=False):
         self.start_time = time.time()
         # Constants
         self.LMDataID = "LARGE_PET_LM_RAWDATA"
@@ -67,13 +77,13 @@ class LMParser:
         self.__open_ptd_file()
         self.__read_dicom_header()        
         
-    def chop( self, retain: int=None, out_filename: str=None, seed: int=11, scaling='linear'):
+    def chop( self, retain: int=None, out_filename: str=None, seed: int=11, rb82: bool=False):
         # Input args
         self.do_chop = True
         self.out_filename = out_filename
         self.retain = retain
-        # Delay scaling
-        self.scaling = scaling
+        # Scaling parameter for promts/randoms
+        self.rb82 = rb82
         self.seed = seed
         # Open OutFile for writing
         self.OutFile = open( self.__generate_output_name() ,'wb')
@@ -104,9 +114,9 @@ class LMParser:
                 """ END PROMPT/DELAY """
                 
                 r_ = random.random()
-                # Rb82 tracer
-                if scaling == "quadratic":
-                    if (int_word >> 30 == 0x1 and r_ < retain_fraction) or (r_ < sqrt(retain_fraction)):
+                # Scales randoms quadratically if tracer is Rb82
+                if self.rb82:
+                    if (int_word >> 30 == 0x1 and r_ < retain_fraction) or ((int_word >> 30) != 0x1 and r_ < (retain_fraction)**2):
                         self.OutFile.write(word)
                         self.KEEP += 1
                     else:
@@ -143,9 +153,7 @@ class LMParser:
                         dict_delays[timestamp] = 0 
                         self.__print(f"Finished {listms/1000} seconds")
             else:
-                # Number of events
-                # dict_events[timestamp] += 1
-                
+                # EVENT WORD
                 if int_word >> 30 == 0x1: 
                     dict_prompts[timestamp] += 1
                 else: 
@@ -155,7 +163,6 @@ class LMParser:
         for k,v in dict_prompts.items():
             df = df.append({'t': k, 'type':'prompt','numEvents':v},ignore_index=True)
             df = df.append({'t': k, 'type':'delay', 'numEvents':dict_delays[k]},ignore_index=True)
-            # df = df.append({'t': k, 'type':'events', 'numEvents':v+dict_delays[k]},ignore_index=True)
         df.t = df.t.astype('float')
         df.numEvents = df.numEvents.astype('int')
         self.__print("Done parsing LM words")
