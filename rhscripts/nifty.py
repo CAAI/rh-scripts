@@ -58,7 +58,7 @@ def reg_resample(ref_file, flo_file, trans_file, out_file, interpol='NN',
     return rsl.run()
 
 
-def reg_aladin(ref_file, flo_file, aff_file, res_file=None, verbosity=None):
+def reg_aladin(ref_file, flo_file, aff_file, in_aff_file=None, res_file=None, verbosity=None):
     """Block Matching algorithm for symmetric global registration
 
     Args:
@@ -79,6 +79,8 @@ def reg_aladin(ref_file, flo_file, aff_file, res_file=None, verbosity=None):
     ral = RegAladin()
     ral.inputs.ref_file = ref_file
     ral.inputs.flo_file = flo_file
+    if in_aff_file:
+        ral.inputs.in_aff_file = in_aff_file
     if res_file:
         ral.inputs.res_file = res_file
     ral.inputs.aff_file = aff_file

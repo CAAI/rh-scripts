@@ -13,7 +13,8 @@ from rhscripts.dcm import (
     generate_SeriesInstanceUID,
     generate_SOPInstanceUID,
     to_rtx,
-    read_rtx
+    read_rtx,
+    get_sort_files_dict
 )
 from rhscripts.version import __version__
 import datetime
@@ -181,7 +182,8 @@ def to_dcm(np_array,
     forceRescaleSlope : boolean, optional
         Forces recalculation of rescale slope
     from_type : str, optional
-        Used to determine how to read the input array, options: 'minc','nifty'
+        Used to determine how to read the input array, options:
+            'minc','nifty','torchio'
 
     Examples
     --------
@@ -210,9 +212,12 @@ def to_dcm(np_array,
     if isinstance(dcmcontainer, str):
         dcmcontainer = Path(dcmcontainer)
 
-    # gather the dicom slices from the container
-    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')
+    # gather the dicom slices from the container - Old way
+    dcm_slices2 = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')
                   and 'Sinograms' not in f.name] # Omit Sinograms dir - Michelle
+
+    # return a dict with keys={0..#slices -1}, values=Path to dcm file
+    dcm_slices = get_sort_files_dict(dcmcontainer)
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
@@ -231,7 +236,7 @@ def to_dcm(np_array,
         totalSlicesInArray = np_array.shape[0]
     if from_type == 'nifty' and is_4D:
         sys.exit('Nifty 4D conversion not yet implemented')
-    if from_type == 'nifty' and not is_4D:
+    if (from_type == 'nifty' or from_type == 'torchio') and not is_4D:
         totalSlicesInArray = np_array.shape[2]
 
     if verbose:
@@ -247,9 +252,12 @@ def to_dcm(np_array,
     dicomfolder.mkdir(parents=True, exist_ok=True)
 
     # List files, do not need to be ordered
-    for f in dcm_slices:
+    for SliceNumber, f in dcm_slices.items():
         ds = dcmread(f)
-        i = int(ds.InstanceNumber)-1
+        # Sometimes this needs to be flipped,
+        # e.g. max(dcm_slices.keys())-SliceNumber-1 (or similar).
+        # This should be triggered by a dicom tag somewhere.
+        i = int(SliceNumber)
 
         # Get single slice
         if from_type == 'minc' and is_4D:
@@ -259,8 +267,11 @@ def to_dcm(np_array,
             assert ds.pixel_array.shape == (np_array.shape[1],np_array.shape[2])
             data_slice = np_array[i,:,:].astype('double')
         elif from_type == 'nifty' and not is_4D:
+            i = int(ds.InstanceNumber)
             assert ds.pixel_array.shape == (np_array.shape[0],np_array.shape[1])
-            data_slice = np.flip(np_array[:, :, -(i+1)].T, 0).astype('double')
+            data_slice = np.flip(np_array[:, :, -1 * i].T, 0).astype('double')
+        elif from_type == 'torchio' and not is_4D:
+            data_slice = np_array[:, :, i].astype('double')
         elif from_type == 'nifty' and is_4D:
             sys.exit('Nifty 4D conversion not yet implemented')
         else:
@@ -311,9 +322,6 @@ def to_dcm(np_array,
             # Update SOP - unique per file
             ds.SOPInstanceUID = generate_SOPInstanceUID(i+1)
 
-            # Update MediaStorageSOPInstanceUID - unique per file
-            #ds.file_meta.MediaStorageSOPInstanceUID = newMSOP # Not needed anymore?
-
             # Same for all files
             ds.SeriesInstanceUID = newSIUID
 
@@ -334,7 +342,8 @@ def mnc_to_dcm(mncfile,
                forceRescaleSlope=False,
                zero_clamp=False,
                clamp_lower: int=None,
-               clamp_upper: int=None):
+               clamp_upper: int=None,
+               flip: bool=False):
     """Convert a minc file to dicom
 
     Parameters
@@ -362,6 +371,8 @@ def mnc_to_dcm(mncfile,
         Force a lower bound on the input data
     clamp_upper : int, optional
         Force an upper bound on the input data
+    flip : boolean, optional
+        If set, the x-axis will be flipped
 
     Examples
     --------
@@ -384,6 +395,9 @@ def mnc_to_dcm(mncfile,
         np_minc = np.maximum( np_minc, clamp_lower )
     if clamp_upper is not None:
         np_minc = np.minimum( np_minc, clamp_upper )
+
+    if flip:
+        np_minc = np.flip(np_minc, axis=0)
 
     to_dcm(np_array=np_minc,
            dicomcontainer=dicomcontainer,
@@ -669,20 +683,22 @@ def rtx_to_nii(dcmfile,
     volume = nib.load(nii_container_file)
 
     # Flip to axial-first orientation (assuming axial last)
-    data = np.swapaxes(volume.get_fdata(), 0, 2)
-    data = np.flip(volume, 0)
+    data = volume.get_fdata()
+    data = np.swapaxes(data, 0, 2)
 
     # Read RTX file. Returns dict of dict with outer key=ROI_index and inner_keys "ROIname" and "data"
     ROI_output = read_rtx( dcmfile=dcmfile,
                            img_size=data.shape,
                            fn_world_to_voxel=lambda x: nib.affines.apply_affine(aff=np.linalg.inv(volume.affine),pts=x),
                            behavior=behavior,
-                           voxel_dims=[-2,0,1],
+                           voxel_dims=[2,0,1],
                            verbose=verbose )
 
     for ROI_id,ROI in ROI_output.items():
+        # Swap back to axial last
+        ROI_data = np.swapaxes(ROI['data'], 2, 0)
         RTNII_outname = nii_output_file if len(ROI_output) == 1 else nii_output_file[:-suffix_length] + "_" + str(ROI_id) + ".nii.gz"
-        RTNII = nib.Nifti1Image(ROI['data'],volume.affine)
+        RTNII = nib.Nifti1Image(ROI_data,volume.affine)
         nib.save(RTNII,RTNII_outname)
 
     # TODO: Write name of ROI to nii tag if possible.. See rtx_to_mnc.

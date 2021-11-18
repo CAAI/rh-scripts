@@ -159,7 +159,7 @@ class Anonymize:
     def anonymize_folder(self,foldername: str,output_foldername: str,
                          new_person_name: str="anonymous", overwrite_ending: bool=False,
                          ending_suffix: str='.dcm', studyInstanceUID: str=None,
-                         replaceUIDs: bool=False):
+                         replaceUIDs: bool=False) -> str:
         """ Function to anonymize all files in the folder and subfolders.
 
         Parameters
@@ -198,8 +198,10 @@ class Anonymize:
         # Check for replaceUIDs:
         if replaceUIDs:
             if studyInstanceUID is None:
-            	studyInstanceUID = generate_StudyInstanceUID()
+                studyInstanceUID = generate_StudyInstanceUID()
             seriesInstanceUID = generate_SeriesInstanceUID()
+        else:
+            seriesInstanceUID = None  # Default when not overwriting
 
         for fid,filename in enumerate(os.listdir(foldername)):
             ending = '.dcm' if os.path.splitext(filename)[1]=='' else os.path.splitext(filename)[1]
@@ -215,7 +217,9 @@ class Anonymize:
             else:
                 if self.verbose:
                     print("Found",filename,"\r")
-                self.anonymize_folder(os.path.join(foldername, filename),os.path.join(output_foldername, filename),new_person_name,studyInstanceUID=studyInstanceUID,seriesInstanceUID=seriesInstanceUID,replaceUIDs=replaceUIDs)
+                self.anonymize_folder(os.path.join(foldername, filename),os.path.join(output_foldername, filename),new_person_name,studyInstanceUID=studyInstanceUID,replaceUIDs=replaceUIDs)
+
+        return studyInstanceUID
 
 """ ANONYMIZE END """
 
@@ -321,6 +325,77 @@ def sort_files(path):
             fname = '%s/dicom_%04d.dcm' % (folder, get_tag(os.path.join(path,dcmfile),'InstanceNumber'))
 
         copyfile(os.path.join(path,dcmfile), fname)
+
+
+def _get_fastest_dim(lst):
+    """
+    lst is [ [x1,y1,z1], [x2,y2,z2], ... ]
+    Will return the index of the dimension with the largest difference
+    between max and min
+    """
+    return np.argmax(list(map(lambda x: max(x)-min(x),
+                              map(list, zip(*[value for value in lst])))))
+
+
+def get_sort_files_dict(path, reduce_if_only_one=True):
+    """ Run through all files in a directory and return a dict of files sorted
+        by their ImagePositionPatient coordinate. Multiple scans will have
+        multiple keys in dict.
+
+    Parameters
+    ----------
+    path : string, Path
+        Path to the dicom files
+
+    Returns
+        dict{ SeriesInstanceUID: dict{ ind: path_to_file } }
+    """
+    path_dict = {}
+    position_dict = {}
+
+    if isinstance(path, str):
+        path = Path(path)
+
+    for p in path.rglob('*'):
+        if p.name.startswith('.'):
+            continue
+        if not p.is_file():
+            continue
+        try:
+            ds = dcmread(str(p))
+            image_position = '_'.join([str(IPP) for IPP in
+                                       ds.ImagePositionPatient])
+            if ds.SeriesInstanceUID not in path_dict:
+                path_dict[ds.SeriesInstanceUID] = {}
+                position_dict[ds.SeriesInstanceUID] = []
+
+            # Add file path and position to dicts
+            path_dict[ds.SeriesInstanceUID][image_position] = p
+            position_dict[ds.SeriesInstanceUID].append(ds.ImagePositionPatient)
+        except Exception as e:
+            print(f"Skipping {p}. Not dicom?. Got error: {e}")
+            pass
+
+    # Keys are x_y_z. Find fastest varying and set key to that, e.g. y only
+    presorted_dict = {}
+    for data_key, d in path_dict.items():
+        presorted_dict[data_key] = {}
+        slice_dimension = _get_fastest_dim(position_dict[data_key])
+        for key, v in d.items():
+            new_key = float(key.split('_')[slice_dimension])
+            presorted_dict[data_key][new_key] = v
+    # Sort the files by ImagePositionPatient
+    sorted_dict = {}
+    for data_key, d in presorted_dict.items():
+        sorted_dict[data_key] = {}
+        for ind, key in enumerate(sorted(d)):
+            sorted_dict[data_key][ind] = d[key]
+
+    if reduce_if_only_one and len(sorted_dict) == 1:
+        # Return only the inner dict, since there is only one series present
+        return next(iter(sorted_dict.values()))
+
+    return sorted_dict
 
 
 def send_data(folder, server=None, checkForEndings=True):
