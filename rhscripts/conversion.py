@@ -211,14 +211,15 @@ def to_dcm(np_array,
         dcmcontainer = Path(dcmcontainer)
 
     # gather the dicom slices from the container
-    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')]
+    dcm_slices = [f for f in dcmcontainer.iterdir() if not f.name.startswith('.')
+                  and 'Sinograms' not in f.name] # Omit Sinograms dir - Michelle
 
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
     data_type = ds.pixel_array.dtype.name
 
     # Determine if this is a 4D array
-    if is_4D := ( hasattr(ds, 'NumberOfSlices') and len(np_array.shape) == 4 ):
+    if is_4D := (hasattr(ds, 'NumberOfSlices') and len(np_array.shape) == 4):
         numberofslices = ds.NumberOfSlices # Get the number of slices per time point
         if verbose:
             print("Converting a 4D array")
@@ -450,7 +451,8 @@ def nifty_to_dcm(nftfile,
     """
 
     np_nifti = nib.load(nftfile).get_fdata()
-
+    # Denorminig - Michelle
+    np_nifti = np_nifti*232429.9/4.0
     # Force values to lie within a range accepted by the dicom container
     if clamp_lower is not None:
         np_nifti = np.maximum( np_nifti, clamp_lower )
