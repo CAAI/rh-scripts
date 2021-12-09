@@ -40,6 +40,7 @@ parser.add_argument("dicom_container", help="Path to the folder containing dicom
 parser.add_argument("dicom_output", help="Path to the output folder for converted dicom", nargs='?')
 parser.add_argument("out_filename", help="Name of the dicom file (without .dcm)", nargs='?')
 parser.add_argument("--axial_dim", help="Specify the dimension of the axial slice in the loaded nifti file", default=0)
+parser.add_argument("--flip_and_rotate", help="Flip and rotate the image", action="store_true")
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -60,4 +61,5 @@ nii_to_rtx( niifile=args.nifty_file,
             out_folder=args.dicom_output,
             out_filename=args.out_filename,
             axial_dim=args.axial_dim,
+            flip=args.flip,
             verbose=args.verbose)

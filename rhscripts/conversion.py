@@ -568,6 +568,7 @@ def nii_to_rtx( niifile: str,
                 out_folder: str,
                 out_filename: str,
                 axial_dim: int = 0,
+                flip_and_rotate: bool = False,
                 verbose: bool=False):
 
     """Convert minc label file to RT struct dicom file
@@ -584,6 +585,8 @@ def nii_to_rtx( niifile: str,
        Name of the output dicom file
     axial_dim : int
        Specify the dimension of the axial slice in the loaded nifti file
+    flip : boolean, optional
+        If set, the x-axis will be flipped   
     verbose : boolean, optional
        Verbosity of function
     """
@@ -591,8 +594,13 @@ def nii_to_rtx( niifile: str,
     np_nifti = nib.load(niifile).get_fdata()
     
     # Convert from axial-first to axial-last
-    np_nifti = np.swapaxes( np.swapaxes( np_nifti, int(axial_dim), 1), 1, 2 )
+    if not int(axial_dim) == 2:
+        np_nifti = np.swapaxes( np.swapaxes( np_nifti, int(axial_dim), 1), 1, 2 )
     # More needed? UNTESTED!!
+    
+    if flip_and_rotate:
+        np_nifti = np.flip(np_nifti, axis=0)
+        np_nifti = np.rot90(np_nifti)
 
     to_rtx( np_roi=np_nifti, dcmcontainer=dcmcontainer, out_folder=out_folder,
             out_filename=out_filename,verbose=verbose)
