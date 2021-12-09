@@ -511,7 +511,7 @@ def to_rtx(np_roi: np.ndarray,
     Parameters
     ----------
     np_roi : np.ndarray
-        Numpy array in memory to be converted. Assume integer values of [0,1(,..)]
+        Numpy array in memory to be converted. Enforces integer values of [0,1(,..)]
     dcmcontainer : string
         Path to dicom container to be used
     out_folder : string
@@ -521,6 +521,11 @@ def to_rtx(np_roi: np.ndarray,
     verbose : boolean, optional
         Verbosity of function
     """
+
+    # Enforce INT conversion    
+    np_roi = np_roi.astype('int8')
+    if not len(np.unique(np_roi)) > 1:
+        print("Only background in ROI! - Will continue to convert, but it is empty.")
 
     from pydicom.sequence import Sequence
     from pydicom.dataset import Dataset, FileDataset
@@ -766,14 +771,13 @@ def to_rtx(np_roi: np.ndarray,
 
     # Get Affine Transform Matrix.
     M=get_affine_transform(first_scan_path,last_scan_path,len(dcm_list))
-
+   
     for i in range(np_roi.max()):
 
         ROI_expanded = (np_roi == i+1).astype('uint8')
 
         #polylines = get_polylines(ROI_expanded[:,:,:,i],M,len(dcm_list)) # Get polylines.
         polylines = get_polylines(ROI_expanded,M,len(dcm_list)) # Get polylines.
-
         roi_set = Dataset()
         roi_set.ROINumber = str(i+1) # (3006,0022) ROI Number
         roi_set.ReferencedFrameOfReferenceUID = dicom_header_first.FrameOfReferenceUID # (3006,0024) Referenced Frame of Reference UID

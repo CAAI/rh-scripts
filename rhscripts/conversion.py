@@ -567,6 +567,7 @@ def nii_to_rtx( niifile: str,
                 dcmcontainer: str,
                 out_folder: str,
                 out_filename: str,
+                axial_dim: int = 0,
                 verbose: bool=False):
 
     """Convert minc label file to RT struct dicom file
@@ -581,14 +582,16 @@ def nii_to_rtx( niifile: str,
        Name of the output folder
     out_filename : string
        Name of the output dicom file
+    axial_dim : int
+       Specify the dimension of the axial slice in the loaded nifti file
     verbose : boolean, optional
        Verbosity of function
     """
     # Load the minc file
     np_nifti = nib.load(niifile).get_fdata()
-
+    
     # Convert from axial-first to axial-last
-    np_nifti = np.swapaxes( np.swapaxes( np_nifti, 0, 1), 1, 2 )
+    np_nifti = np.swapaxes( np.swapaxes( np_nifti, int(axial_dim), 1), 1, 2 )
     # More needed? UNTESTED!!
 
     to_rtx( np_roi=np_nifti, dcmcontainer=dcmcontainer, out_folder=out_folder,
