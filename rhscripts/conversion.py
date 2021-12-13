@@ -267,7 +267,7 @@ def to_dcm(np_array,
             assert ds.pixel_array.shape == (np_array.shape[1],np_array.shape[2])
             data_slice = np_array[i,:,:].astype('double')
         elif from_type == 'nifty' and not is_4D:
-            i = int(ds.InstanceNumber)
+            #i = int(ds.InstanceNumber) - this sorting doesn't work for gated
             assert ds.pixel_array.shape == (np_array.shape[0],np_array.shape[1])
             data_slice = np.flip(np_array[:, :, -1 * i].T, 0).astype('double')
         elif from_type == 'torchio' and not is_4D:
