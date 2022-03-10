@@ -64,8 +64,55 @@ class LMParser:
         self.do_chop=False
         # Setup and open PTD file
         self.__open_ptd_file()
-        self.__read_dicom_header()        
-        
+        self.__read_dicom_header() 
+
+    def __update_header( self ):
+        import tempfile, re
+        temp_filename = next(tempfile._get_candidate_names())
+
+        old_dicombuffer_length = len(self.DicomBuffer)
+
+        # Modify the line found with "cat/strings <.ptd>" called: "tracer activity at time of injection (Bq):=<dose>"
+        ds = pydicom.filereader.dcmread(pydicom.filebase.DicomBytesIO(self.DicomBuffer))
+        tag = ds[0x29, 0x1010]
+        partial = tag.value
+        start_string = 0
+        end_string = 0
+        for ind, l in enumerate(partial.decode().split('\n')):
+            start_string = end_string
+            end_string+=len(l)+1
+            if l.startswith('tracer activity'):
+                injected_dose_e = l.split(':=')[1].split('\r')[0]
+                injected_dose = float(injected_dose_e)
+                retained_injected_dose = injected_dose * float( self.retain / 100.0 )
+                break
+        self.__print('{:.1f} MBq -> {:.1f} MBq at {} retain value (in %)'.format(injected_dose/1000000, retained_injected_dose/1000000, self.retain))
+        retained_injected_dose_e = '{:.3e}'.format(retained_injected_dose)
+        new_string = l.replace(injected_dose_e, retained_injected_dose_e)+'\n'
+        ds[0x29, 0x1010].value = partial.replace(partial[start_string:end_string], str.encode(new_string))
+        ds.save_as(temp_filename)
+        with open(temp_filename, "rb") as raw:
+            self.DicomBuffer = raw.read(self.DicomHeaderLength)
+
+        # Update the XML tag: <InjectedDose>...</InjectedDose>
+        reg_str = "<InjectedDose>(.*?)</InjectedDose>"
+        res = re.findall(reg_str, str(self.DicomBuffer))
+        for dose in res:
+            retained_injected_dose = int(float(dose) * float( self.retain / 100.0 ))
+            retained_injected_dose = str(retained_injected_dose).zfill(len(dose.split('.')[0]))
+            retained_injected_dose_trailing_zeros = "0" * len(dose.split('.')[1])
+            dose_string = f"<InjectedDose>{dose}</InjectedDose>"
+            retained_dose_string = f"<InjectedDose>{retained_injected_dose}.{retained_injected_dose_trailing_zeros}</InjectedDose>"
+            if not len(retained_dose_string) == len(dose_string):
+                # OBS - JSRecon12 fails if the the two numbers does not have the same number of digits, including before and after delimiter
+                print("Retained dose does not have the same number of digits in XML tag. JSrecon will fail. Exiting")
+                exit(-1)
+            self.DicomBuffer = self.DicomBuffer.replace(str.encode(dose_string), str.encode(retained_dose_string))
+        Path(temp_filename).unlink()
+
+        self.DicomHeaderLength = len(self.DicomBuffer)
+        self.__print(f"Modified DicomHeaderLength\n\tfrom {old_dicombuffer_length}\n\tto {self.DicomHeaderLength}")
+
     def chop( self, retain: int=None, out_filename: str=None, seed: int=11 ):
         # Input args
         self.do_chop = True
@@ -108,6 +155,30 @@ class LMParser:
         self.__print(f"Prompts: {self.PROMPT}\nDelays: {self.DELAY}")
         self.__print(f"TAGS: {self.TAG_WORD}\nEVENTS: {self.EVENT_WORD}")
         self.__print(f"Keep: {self.KEEP}\nToss: {self.TOSS}\nRatio: {self.KEEP/self.EVENT_WORD*100:.2f}")
+
+        # Modify DICOM header
+        self.__update_header()
+        
+        # Write DICOM header etc back to file
+        self.__write_header()
+
+    def fake_chop( self, retain: int=None, out_filename: str=None ):
+        self.out_filename = out_filename
+        self.retain = retain
+        self.do_chop = True # To trigger write of out file
+        # Open OutFile for writing
+        self.OutFile = open( self.__generate_output_name() ,'wb')
+        # Scale retain to 0-1.
+        retain_fraction = float( self.retain / 100.0 )
+
+        # Write LM data
+        self.__prepare_lm_file()
+        for word in self.__read_list():
+            self.OutFile.write(word)
+        self.__print("Done parsing LM words")
+
+        # Modify DICOM header
+        self.__update_header()
         
         # Write DICOM header etc back to file
         self.__write_header()

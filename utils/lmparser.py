@@ -52,6 +52,7 @@ Date: 11-04-2021
 parser = argparse.ArgumentParser()
 parser.add_argument("ptd_file", help='Input PTD LLM file', type=str)
 parser.add_argument("--retain", help='Percent (float) of LMM events to retain (0-100)', type=float)
+parser.add_argument("--fake_retain", help='Percent (float) of LMM events to retain (0-100). !! Does not actually do any chopping !!, but update header of ptd to reflect the previously performed chop.', type=float)
 parser.add_argument("--out_folder", help='Output folder for chopped PTD LLM file(s)', type=str)
 parser.add_argument("--out_filename", help='Output filename for chopped PTD LLM file', type=str)
 parser.add_argument("--seed", help='Seed value for random', default=11, type=int)
@@ -63,6 +64,7 @@ args = parser.parse_args()
 parser = LMParser( ptd_file = args.ptd_file,  out_folder = args.out_folder, 
                    anonymize = args.anonymize, verbose = args.verbose)
 if args.retain: parser.chop(retain = args.retain, out_filename = args.out_filename, seed = args.seed)
+if args.fake_retain: parser.fake_chop(retain = args.fake_retain, out_filename = args.out_filename)
 if args.out_dicom: parser.save_dicom(args.out_dicom)
 parser.close()
     
