@@ -77,6 +77,40 @@ class LMParser:
         self.__open_ptd_file()
         self.__read_dicom_header()        
         
+        
+    def __update_header( self ):
+        import tempfile
+        temp_filename = next(tempfile._get_candidate_names())
+
+        ds = pydicom.filereader.dcmread(pydicom.filebase.DicomBytesIO(self.DicomBuffer))
+        tag = ds[0x29, 0x1010]
+        partial = tag.value
+        start_string = 0
+        end_string = 0
+        for ind, l in enumerate(partial.decode().split('\n')):
+            start_string = end_string
+            end_string+=len(l)+1
+            if l.startswith('tracer activity'):
+                injected_dose_e = l.split(':=')[1].split('\r')[0]
+                injected_dose = float(injected_dose_e)
+                retained_injected_dose = injected_dose * float( self.retain / 100.0 )
+                break
+        self.__print('{:.1f} MBq -> {:.1f} MBq at {} retain value (in %)'.format(injected_dose/1000000, retained_injected_dose/1000000, self.retain))
+
+        retained_injected_dose_e = '{:.3e}'.format(retained_injected_dose)
+
+        if not len(injected_dose_e) == len(retained_injected_dose_e):
+            self.__print("Modified DicomHeaderLength\n\tfrom {}".format(self.DicomHeaderLength))
+            self.DicomHeaderLength += len(retained_injected_dose_e)-len(injected_dose_e)
+            self.__print("\tTo: {}".format(self.DicomHeaderLength))
+
+        new_string = l.replace(injected_dose_e, retained_injected_dose_e)+'\n'
+        ds[0x29, 0x1010].value = partial.replace(partial[start_string:end_string], str.encode(new_string))
+        ds.save_as(temp_filename)
+        with open(temp_filename, "rb") as raw:
+            self.DicomBuffer = raw.read(self.DicomHeaderLength)
+        Path(temp_filename).unlink()  
+
     def chop( self, retain: int=None, out_filename: str=None, seed: int=11, rb82: bool=False):
         # Input args
         self.do_chop = True
@@ -132,6 +166,8 @@ class LMParser:
         self.__print(f"TAGS: {self.TAG_WORD}\nEVENTS: {self.EVENT_WORD}")
         self.__print(f"Keep: {self.KEEP}\nToss: {self.TOSS}\nRatio: {self.KEEP/self.EVENT_WORD*100:.2f}")
         
+        # Modify DICOM header
+        self.__update_header()
         # Write DICOM header etc back to file
         self.__write_header()
         

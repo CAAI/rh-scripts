@@ -466,7 +466,7 @@ def nifty_to_dcm(nftfile,
 
     np_nifti = nib.load(nftfile).get_fdata()
     # Denorminig - Michelle
-    np_nifti = np_nifti*232429.9/4.0
+    np_nifti = np_nifti*670900.2/4.0
     # Force values to lie within a range accepted by the dicom container
     if clamp_lower is not None:
         np_nifti = np.maximum( np_nifti, clamp_lower )
