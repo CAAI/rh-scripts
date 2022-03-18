@@ -124,7 +124,7 @@ class LMParser:
         self.DicomHeaderLength = len(self.DicomBuffer)
         self.__print(f"Modified DicomHeaderLength\n\tfrom {old_dicombuffer_length}\n\tto {self.DicomHeaderLength}")
 
-    def chop( self, retain: int=None, out_filename: str=None, seed: int=11 ):
+    def chop( self, retain: int=None, out_filename: str=None, seed: int=11 , rb82: bool=False):
         # Input args
         self.do_chop = True
         self.out_filename = out_filename
