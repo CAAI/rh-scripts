@@ -37,6 +37,8 @@ VERSIONING
         Sets the check for dicom files in container to false
     forceRescaleSlope : boolean, optional
         Forces recalculation of RescaleSlope
+    flip : boolean, optional
+        If set, the x-axis will be flipped
     verbose : boolean, optional
         Set the verbosity
     version : boolean, optional
@@ -54,6 +56,7 @@ parser.add_argument('--id', help="New ID of the DICOM file", nargs=1, type=int)
 parser.add_argument("--ignore_check", help="Ignore the check for dicom files in container", action="store_false")
 parser.add_argument("--forceRescaleSlope", help="Force the script to recalculate rescale slope", action="store_true")
 parser.add_argument("--zero_clamp", help="Force non-zero values to zero", action="store_true")
+parser.add_argument("--flip", help="Flip the x-axis", action="store_true")
 parser.add_argument("-v","--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("--version", help="Print version", action="store_true")
 
@@ -69,13 +72,14 @@ if not args.minc_file or not args.dicom_container or not args.dicom_output:
     print('Too few arguments')
     exit(-1)
 
-mnc_to_dcm( args.minc_file, 
-            args.dicom_container, 
-            args.dicom_output, 
-            verbose=args.verbose, 
-            modify=args.modify, 
-            description=args.description, 
-            study_id=args.id, 
+mnc_to_dcm( args.minc_file,
+            args.dicom_container,
+            args.dicom_output,
+            verbose=args.verbose,
+            modify=args.modify,
+            description=args.description,
+            study_id=args.id,
             checkForFileEndings=args.ignore_check,
             forceRescaleSlope=args.forceRescaleSlope,
+            flip=args.flip,
             zero_clamp=args.zero_clamp)

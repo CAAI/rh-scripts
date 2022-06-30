@@ -301,7 +301,8 @@ def to_dcm(np_array,
         ds.PixelData = data_slice.tostring()
 
         # Update LargesImagetPixelValue tag pr slice
-        ds.LargestImagePixelValue = int(np.ceil(data_slice.max()))
+        if 'LargestImagePixelValue' in ds:
+            ds.LargestImagePixelValue = int(np.ceil(data_slice.max()))
 
         if modify:
             if verbose:

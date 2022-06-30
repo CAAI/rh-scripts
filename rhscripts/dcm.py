@@ -7,13 +7,15 @@ from shutil import copyfile
 import datetime
 import numpy as np
 from pathlib import Path
-from typing import Optional, Tuple, Callable, Dict
+from typing import Optional, Tuple, Callable, Dict, Union
 from pydicom import dcmread
 from pydicom.filereader import InvalidDicomError #For rtx2mnc
 import cv2
 import random
 import socket
 from rhscripts.version import __version__
+import nibabel as nib
+
 
 def __generate_uid_suffix() -> str:
     """ Generate and return a new UID """
@@ -151,7 +153,7 @@ class Anonymize:
 
         # Overwrite filename
         if self.sort_by_instance_number:
-            output_filename = "dicom"+str(ds.InstanceNumber).zfill(4)+'.dcm'
+            output_filename = str(Path(output_filename).parent.joinpath("dicom"+str(ds.InstanceNumber).zfill(4)+'.dcm'))
 
         # write the 'anonymized' DICOM out under the new filename
         ds.save_as(output_filename)
@@ -222,6 +224,79 @@ class Anonymize:
         return studyInstanceUID
 
 """ ANONYMIZE END """
+
+def get_suv_constants(
+    file:Union[str, Path, dicom.Dataset],
+    overwrite_values:Dict=None
+) -> Tuple[Dict, Callable[[float], float]]:
+    """ Extract the constants used for SUV normalization
+    Parameters
+    ----------
+    file: 
+        Path to string with dicom dataset, or pre-loaded dicom dataset
+    
+    Returns
+    -------
+    d: dict
+        Dict with relevant information to perform SUV normalization
+    fn: Callable
+        Function to perform SUV normalization given a value
+    
+    """
+    if isinstance(file, (str, Path)):
+        ds = dcmread(file)
+    else:
+        ds = file
+
+    # Injection time
+    inj_time = ds[0x54,0x16][0][0x18,0x1072].value
+
+    # Scan time
+    acq_time = ds.AcquisitionTime
+
+    # Injected dose
+    dose = int(ds[0x54,0x16][0][0x18,0x1074].value)
+    if dose > 999999:
+        dose /= 1000000.0 # Convert to MBq
+
+    # Halflife pr minute
+    halflife = float(ds[0x54,0x16][0].RadionuclideHalfLife) / 60
+
+    # Time diff
+    d1 = datetime.datetime.strptime(inj_time, '%H%M%S.%f')
+    d2 = datetime.datetime.strptime(acq_time, '%H%M%S.%f')
+    diff = (d2 - d1).total_seconds() / 60
+
+    # Reduced dose
+    reduced_dose = dose*math.exp(math.log(2)/halflife*-diff)
+        
+    # Weight
+    weight = int(ds[0x10, 0x1030].value)
+
+    if overwrite_values is not None:
+        # Manually overwrite values - might be relevant for dose, weight and post injection time
+        for k, v in overwrite_values.items():
+            if k == "weight":
+                weight = v
+            elif k == "dose":
+                dose = v
+            elif k == "diff":
+                diff = v
+    # SUV conversion
+    fn = lambda x: (x * weight) / (reduced_dose * 1000)
+
+    d = {
+        'inj_time': inj_time,
+        'acq_time': acq_time,
+        'post_injection_time': diff,
+        'injected_dose': dose,
+        'halflife': halflife,
+        'corrected_dose': reduced_dose,
+        'weight': weight
+    }
+    
+    return d, fn
+
 
 def get_description(file):
     """Get the SeriesDescription of a dicom file
@@ -294,6 +369,55 @@ def get_tag(file,tag):
         Tag name
     """
     return dicom.read_file(file, force=True).data_element(tag).value
+
+
+def get_reference_seriesUID_from_RTSS(file: Union[str, Path, dicom.dataset.Dataset]) -> str:
+    """ Get the SeriesInstanceUID of the dataset that the RTSS is associated to """
+    if not isinstance(file, dicom.dataset.Dataset):
+        if not os.path.exists(str(file)):
+            return None
+        file = dcmread(file)
+    return file.ReferencedFrameOfReferenceSequence[0].RTReferencedStudySequence[0].RTReferencedSeriesSequence[0].SeriesInstanceUID
+
+
+def get_AC_series_info_from_PET(file: Union[str, Path, dicom.dataset.Dataset]) -> Tuple[str, str, str]:
+    """ Get the StudyInstanceUID and SeriesInstanceUID from a PET dataset
+    See https://marketing.webassets.siemens-healthineers.com/e43a3d1665dd2046/3141915b25bb/10751414-EKL-001-01-VG80-Osprey.pdf
+    
+    Parameters
+    ----------
+    file: str, Path, or dicom dataset
+        Path to a file containing a dicom dataset, or a pre-loaded dicom series
+
+    Returns
+    -----------
+    CT_used_for: str
+        The purposed of the referenced CT - can be ACCT or Matching anatomy (and likely also ACCT).
+        If dataset is not found (when filepath is supplied) the returned code is "No such file".
+        If the correct tags used to extract the information is not present in the dataset, "Missing tag" will be returned.
+    StudyInstanceUID: str
+        The study ID of the ACCT series used for PET attenuation correction
+    SeriesInstanceUID: str
+        The Series ID of the ACCT series used for PET attenuation correction
+    """
+    if not isinstance(file, dicom.dataset.Dataset):
+        if not os.path.exists(str(file)):
+            return 'No such file', '', ''
+        file = dcmread(file)
+
+    priv_tag = (0x08, 0x1250)
+    if not priv_tag in file:
+        return 'Missing tag', '', ''
+    StudyInstanceUID = file[priv_tag][0][0x20,0xd].value
+    SeriesInstanceUID = file[priv_tag][0][0x20,0xe].value
+    if (CT_code := file[priv_tag][0][(0x40,0xa170)][0][0x8,0x100].value) == '122401':
+        CT_used_for = 'SameAnatomy'
+    elif CT_code == '122403':
+        CT_used_for = 'ACCT'
+    else:
+        CT_used_for = 'Unknown'
+    return CT_used_for, StudyInstanceUID, SeriesInstanceUID
+
 
 def sort_files(path):
     """ Sort a folder of DICOM files
@@ -658,6 +782,7 @@ def to_rtx(np_roi: np.ndarray,
 
     # Check that all dicom images in the folder belong to the same series.
     if checkEqual(series_list) == False:
+        import sys
         print("Error: All image slices must belong to the same series.")
         sys.exit()
 
@@ -767,7 +892,7 @@ def to_rtx(np_roi: np.ndarray,
     # Get Affine Transform Matrix.
     M=get_affine_transform(first_scan_path,last_scan_path,len(dcm_list))
 
-    for i in range(np_roi.max()):
+    for i in range(int(np_roi.max())):
 
         ROI_expanded = (np_roi == i+1).astype('uint8')
 
@@ -868,14 +993,11 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
             for contour in contour_sequences:
                 assert contour.ContourGeometricType == "CLOSED_PLANAR"
 
-                current_slice_i_print = 0
-
                 if verbose:
                     print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
 
                 world_coordinate_points = np.array(contour.ContourData)
                 world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
-                current_slice = np.zeros((img_size[1],img_size[2]))
                 voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
                 current_slice_i = 0
                 for wi,world in enumerate(world_coordinate_points):
@@ -890,7 +1012,6 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                     if wi == 0 and not int(round(current_slice_i)) in contour_points:
                         contour_points[int(round(current_slice_i))] = []
                     contour_points[int(round(current_slice_i))].append([voxel[voxel_dims[1]],voxel[voxel_dims[2]]])
-
                 current_slice_inner = np.zeros((img_size[1],img_size[2]),dtype=np.float32)
                 if behavior == 'default':
                     # Locate each voxel covered by, or located inside, a polygon contour
@@ -907,6 +1028,219 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
                             )
                     current_slice_inner = (current_slice_inner>0).astype('uint8')
                 data[int(round(current_slice_i))] += current_slice_inner
+
+            # Remove even areas - implies a hole.
+            data[data % 2 == 0] = 0
+
+            ROI_output[ROI_id] = {'ROIname': RTSS.StructureSetROISequence[ROI_id].ROIName,
+                                  'data': data,
+                                  'contour_points': contour_points}
+        return ROI_output
+    except InvalidDicomError:
+        print("Could not read DICOM RTX file", dcmfile)
+        exit(-1)
+
+
+def read_rtx_v2(dcmfile: str, img_size: Tuple[int, int, int],
+                fn_world_to_voxel: Callable, affine: np.ndarray,
+                behavior: str = 'default', verbose: bool = False) \
+                -> Dict[int, Dict[str, np.ndarray]]:
+    """Read dcm file (RT struct) to dict of np.arrays - one for each ROI
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    THIS FUNCTION IS EXPERIMENTAL AND UNDER DEVELOPMENT TO 
+    POTENTIALLY REPLACE THE DEFAULT read_rtss FUNCTION ABOVE
+    USE WITH CAUSION - AND COMPARE TO EXPECTED OUTCOME
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    Parameters
+    ----------
+    dcmfile : string
+        Path to the dicom file (RT struct)
+    img_size : (int,int,int)
+        Size of the reference volume that the RT struct was defined on.
+        Assuming (slice,width,height)
+    fn_world_to_voxel : string
+        Function to convert world coordinate to voxel coordinate
+    behavior : string
+        Chose how to convert to polygon. Options: default, mirada
+    flip_read_direction : boolean
+        ...
+    verbose : boolean, optional
+        Default = False (if true, print info)
+    Examples
+    --------
+    >>> from rhscripts.conversion import read_rtx_v2
+    >>> read_rtx_v2(
+            'RTstruct.dcm',
+            [127,344,344],
+            volume.convertWorldToVoxel, # When using minc
+            affine=container.affine)
+    """
+    try:
+        RTSS = dicom.read_file(dcmfile)
+        ROIs = RTSS.ROIContourSequence
+        ROI_output = {}
+
+        # # Determine reading directions
+        # voxel_dims = [None, None, None]
+        # codes = nib.aff2axcodes(affine)
+        # # Get the slice dimension
+        # if codes[2] in ('R', 'L'):  # Sagittal
+        #     pass
+        # elif codes[2] in ('S', 'I'):  # Axial
+        #     pass
+        # elif codes[2] in ('P', 'A'):  # Coronal
+        #     pass
+        # else:
+        #     raise ValueError('Wrong affine file..')
+
+        if verbose:
+            print(RTSS.StructureSetROISequence[0].ROIName)
+            print("Found", len(ROIs), "ROIs")
+
+        for ROI_id, ROI in enumerate(ROIs):
+
+            data = np.zeros(img_size)
+            contour_sequences = ROI.ContourSequence
+            contour_points = {}
+
+            if verbose:
+                print(" --> Found", len(contour_sequences), "contour sequences for ROI:", RTSS.StructureSetROISequence[ROI_id].ROIName)
+
+            for contour in contour_sequences:
+                assert contour.ContourGeometricType == "CLOSED_PLANAR"
+
+                if verbose:
+                    print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
+
+                world_coordinate_points = np.array(contour.ContourData)
+                world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
+                voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
+                current_slice_i = 0
+                for wi, world in enumerate(world_coordinate_points):
+                    voxel = fn_world_to_voxel([-world[0], -world[1], world[2]])
+                    current_slice_i = voxel[2]
+                    voxel_coordinates_inplane[wi, :] = [voxel[1], voxel[0]]
+
+                    # Track the contour points as well in float
+                    k = int(round(current_slice_i))
+                    if k not in contour_points:
+                        contour_points[k] = []
+                    contour_points[k].append([voxel[1],voxel[0]])
+                current_slice_inner = np.zeros((img_size[0],img_size[1]),dtype=np.float32)
+                if behavior == 'default':
+                    # Locate each voxel covered by, or located inside, a polygon contour
+                    converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
+                    cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
+                elif behavior == 'mirada':
+                    # Check for each voxel if its center is inside polygon
+                    for x in range( img_size[1] ):
+                        for y in range( img_size[0] ):
+                            current_slice_inner[ x, y ] = cv2.pointPolygonTest(
+                                    np.array([voxel_coordinates_inplane], dtype='float32'),
+                                    (y,x), # Not sure if should be swapped, or needs a 0.5 voxel offset for center?
+                                    False
+                            )
+                    current_slice_inner = (current_slice_inner>0).astype('uint8')
+                data[:,:,int(round(current_slice_i))] += current_slice_inner
+
+            # Remove even areas - implies a hole.
+            data[data % 2 == 0] = 0
+
+            ROI_output[ROI_id] = {'ROIname': RTSS.StructureSetROISequence[ROI_id].ROIName,
+                                  'data': data,
+                                  'contour_points': contour_points}
+        return ROI_output
+    except InvalidDicomError:
+        print("Could not read DICOM RTX file", dcmfile)
+        exit(-1)
+
+def read_rtx_v3( dcmfile: str, img_size: Tuple[int,int,int],
+              fn_world_to_voxel: Callable, behavior: str='default',
+              voxel_dims: Tuple[int,int,int]=[0,2,1],
+              verbose: bool=False ) -> Dict[int, Dict[str,np.ndarray]]:
+    """Read dcm file (RT struct) to dict of np.arrays - one for each ROI
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    THIS FUNCTION IS EXPERIMENTAL AND UNDER DEVELOPMENT TO 
+    POTENTIALLY REPLACE THE DEFAULT read_rtss FUNCTION ABOVE
+    USE WITH CAUSION - AND COMPARE TO EXPECTED OUTCOME
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    Parameters
+    ----------
+    dcmfile : string
+        Path to the dicom file (RT struct)
+    img_size : (int,int,int)
+        Size of the reference volume that the RT struct was defined on.
+        Assuming (width,height,slice)
+    fn_world_to_voxel : string
+        Function to convert world coordinate to voxel coordinate
+    behavior : string
+        Chose how to convert to polygon. Options: default, mirada
+    flip_read_direction : boolean
+        ...
+    verbose : boolean, optional
+        Default = False (if true, print info)
+    Examples
+    --------
+    >>> from rhscripts.conversion import read_rtx
+    >>> read_rtx('RTstruct.dcm',[127,344,344],volume.convertWorldToVoxel,verbose=False)
+    """
+    try:
+        RTSS = dicom.read_file(dcmfile)
+        ROIs = RTSS.ROIContourSequence
+        ROI_output = {}
+
+        if verbose:
+            print(RTSS.StructureSetROISequence[0].ROIName)
+            print("Found",len(ROIs),"ROIs")
+
+        for ROI_id,ROI in enumerate(ROIs):
+
+            data = np.zeros(img_size)
+            contour_sequences = ROI.ContourSequence
+            contour_points = {}
+
+            if verbose:
+                print(" --> Found",len(contour_sequences),"contour sequences for ROI:",RTSS.StructureSetROISequence[ROI_id].ROIName)
+
+            for contour in contour_sequences:
+                assert contour.ContourGeometricType == "CLOSED_PLANAR"
+
+                if verbose:
+                    print("\t",contour.ContourNumber,"contains",contour.NumberOfContourPoints)
+
+                world_coordinate_points = np.array(contour.ContourData)
+                world_coordinate_points = world_coordinate_points.reshape((contour.NumberOfContourPoints,3))
+                voxel_coordinates_inplane = np.zeros((len(world_coordinate_points),2))
+                current_slice_i = 0
+                for wi, world in enumerate(world_coordinate_points):
+                    voxel = fn_world_to_voxel([-world[0],-world[1],world[2]])
+                    current_slice_i = voxel[2]
+                    voxel_coordinates_inplane[wi,:] = [voxel[0],voxel[1]]
+
+                    # Track the contour points as well in float
+                    if wi == 0 and not int(round(current_slice_i)) in contour_points:
+                        contour_points[int(round(current_slice_i))] = []
+                    contour_points[int(round(current_slice_i))].append([voxel[0],voxel[1]])
+                current_slice_inner = np.zeros((img_size[0],img_size[1]),dtype=np.float32)
+                if behavior == 'default':
+                    # Locate each voxel covered by, or located inside, a polygon contour
+                    converted_voxel_coordinates_inplane = np.array(np.round(voxel_coordinates_inplane),np.int32)
+                    cv2.fillPoly(current_slice_inner,pts=[converted_voxel_coordinates_inplane],color=1)
+                elif behavior == 'mirada':
+                    # Check for each voxel if its center is inside polygon
+                    for x in range( img_size[0] ):
+                        for y in range( img_size[1] ):
+                            current_slice_inner[ x, y ] = cv2.pointPolygonTest(
+                                    np.array( [voxel_coordinates_inplane], dtype='float32' ),
+                                    (x,y), # Not sure if needs a 0.5 voxel offset for center?
+                                    False
+                            )
+                    current_slice_inner = (current_slice_inner>0).astype('uint8')
+                data[:, :, int(round(current_slice_i))] += current_slice_inner
 
             # Remove even areas - implies a hole.
             data[data % 2 == 0] = 0
