@@ -628,6 +628,7 @@ def to_rtx(np_roi: np.ndarray,
            dcmcontainer: str,
            out_folder: str,
            out_filename: str,
+           roi_names: list=None,
            verbose: bool=False):
 
     """Convert label numpy array to RT struct dicom file
@@ -642,6 +643,8 @@ def to_rtx(np_roi: np.ndarray,
         Name of the output folder
     out_filename : string
         Name of the output dicom file
+    roi_names : list
+        Set the ROI names
     verbose : boolean, optional
         Verbosity of function
     """
@@ -902,7 +905,10 @@ def to_rtx(np_roi: np.ndarray,
         roi_set = Dataset()
         roi_set.ROINumber = str(i+1) # (3006,0022) ROI Number
         roi_set.ReferencedFrameOfReferenceUID = dicom_header_first.FrameOfReferenceUID # (3006,0024) Referenced Frame of Reference UID
-        roi_set.ROIName = 'ROI_'+str(i+1) # (3006,0026) ROI Name
+        if roi_names is not None and len(roi_names) == int(np_roi.max()):
+            roi_set.ROIName = roi_names[i]
+        else:
+            roi_set.ROIName = 'ROI_'+str(i+1) # (3006,0026) ROI Name
         roi_set.ROIGenerationAlgorithm = 'AUTOMATIC' # (3006,0036) ROI Generation Algorithm
         if i == 0:
             RTSTRUCT.StructureSetROISequence[0] = roi_set
