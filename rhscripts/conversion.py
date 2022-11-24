@@ -536,6 +536,7 @@ def mnc_to_rtx( mncfile: str,
                 dcmcontainer: str,
                 out_folder: str,
                 out_filename: str,
+                roi_names: list=None,
                 verbose: bool=False):
 
     """Convert minc label file to RT struct dicom file
@@ -562,12 +563,13 @@ def mnc_to_rtx( mncfile: str,
     # Convert from axial-first to axial-last
     np_minc = np.swapaxes( np.swapaxes( np_minc, 0, 1), 1, 2 )
     to_rtx( np_roi=np_minc, dcmcontainer=dcmcontainer, out_folder=out_folder,
-            out_filename=out_filename,verbose=verbose)
+            out_filename=out_filename,roi_names=roi_names,verbose=verbose)
 
 def nii_to_rtx( niifile: str,
                 dcmcontainer: str,
                 out_folder: str,
                 out_filename: str,
+                roi_names: list=None,
                 verbose: bool=False):
 
     """Convert minc label file to RT struct dicom file
@@ -593,7 +595,7 @@ def nii_to_rtx( niifile: str,
     # More needed? UNTESTED!!
 
     to_rtx( np_roi=np_nifti, dcmcontainer=dcmcontainer, out_folder=out_folder,
-            out_filename=out_filename,verbose=verbose)
+            out_filename=out_filename,roi_names=roi_names,verbose=verbose)
 
 def rtx_to_mnc(dcmfile,
                mnc_container_file,
