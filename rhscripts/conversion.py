@@ -216,6 +216,11 @@ def to_dcm(np_array,
     # return a dict with keys={0..#slices -1}, values=Path to dcm file
     dcm_slices = get_sort_files_dict(dcmcontainer)
 
+    # Special behavior of get_sort_files:
+    # when multiple volumes are found, the top level keys will be series UIDs for the volumnes and not numbers
+    if 0 not in dcm_slices:
+        raise Exception(f"Multiple DICOM volumes were found in {dcmcontainer}. Please ensure that all dicom files belong to the same volume")
+
     # Get information about the dataset from a single file
     ds = dcmread(dcm_slices[0])
     data_type = ds.pixel_array.dtype.name
