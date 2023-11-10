@@ -113,3 +113,7 @@ def hausdorff_distance( arr1: np.ndarray, arr2: np.ndarray, axial_orientation: i
             max_distance = max( max_distance, hausdorff_distance(u,v) )
         return max_distance
     return max(distance.directed_hausdorff(arr1, arr2)[0], distance.directed_hausdorff(arr2, arr1)[0])
+
+def get_volume(arr: np.ndarray, voxel_size: list, target_class: int=1):
+    num_voxels = (arr==target_class).sum()
+    return np.prod(voxel_size) * num_voxels
