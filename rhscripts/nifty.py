@@ -359,10 +359,10 @@ def reorient_to_std(in_file: typing.Union[str, pathlib.Path], out_file: typing.U
 ###############################   FREESURFER REGISTRATION   ##########################################
 ######################################################################################################
 
+""" Wrapper to mri_robust_register """
 def freesurfer_align_volumes_in_common_space(source: typing.Union[str, pathlib.Path], target: typing.Union[str, pathlib.Path], out_lta_file: typing.Union[str, pathlib.Path, None], 
                                              out_half_src_file: typing.Union[str, pathlib.Path, None], out_half_src_lta_file: typing.Union[str, pathlib.Path, None],
                                              out_half_tgt_file: typing.Union[str, pathlib.Path, None], out_half_tgt_lta_file: typing.Union[str, pathlib.Path, None]) -> None:
-
     reg = RobustRegister()
     reg.inputs.source_file = source
     reg.inputs.target_file = target
@@ -375,13 +375,13 @@ def freesurfer_align_volumes_in_common_space(source: typing.Union[str, pathlib.P
     reg.inputs.auto_sens = True
     reg.run()
 
-
+""" Wrapper to mri_vol2vol """
 def freesurfer_resample_volumes(source: typing.Union[str, pathlib.Path], target: typing.Union[str, pathlib.Path], lta_file: typing.Union[str, pathlib.Path], 
                                 output_file: typing.Union[str, pathlib.Path], interp:str='nearest') -> None:
     applyreg = ApplyVolTransform()
     applyreg.inputs.source_file = source
     applyreg.inputs.lta_file = lta_file
     applyreg.inputs.target_file = target
-    applyreg.inputs.interp = 'nearest'
+    applyreg.inputs.interp = interp
     applyreg.inputs.transformed_file = output_file
     applyreg.run()
