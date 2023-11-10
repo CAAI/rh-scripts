@@ -9,6 +9,7 @@ from nipype.interfaces.fsl import (
 )
 from nipype.interfaces.fsl.maths import ApplyMask, BinaryMaths, UnaryMaths
 from nipype.interfaces.niftyreg import RegResample, RegAladin, RegTransform
+from nipype.interfaces.freesurfer import RobustRegister, ApplyVolTransform
 import typing
 import pathlib
 import os
@@ -352,3 +353,35 @@ def reorient_to_std(in_file: typing.Union[str, pathlib.Path], out_file: typing.U
     reorient.inputs.in_file = in_file
     reorient.inputs.out_file = out_file
     res = reorient.run()
+
+
+######################################################################################################
+###############################   FREESURFER REGISTRATION   ##########################################
+######################################################################################################
+
+def freesurfer_align_volumes_in_common_space(source: typing.Union[str, pathlib.Path], target: typing.Union[str, pathlib.Path], out_lta_file: typing.Union[str, pathlib.Path, None], 
+                                             out_half_src_file: typing.Union[str, pathlib.Path, None], out_half_src_lta_file: typing.Union[str, pathlib.Path, None],
+                                             out_half_tgt_file: typing.Union[str, pathlib.Path, None], out_half_tgt_lta_file: typing.Union[str, pathlib.Path, None]) -> None:
+
+    reg = RobustRegister()
+    reg.inputs.source_file = source
+    reg.inputs.target_file = target
+    reg.inputs.out_reg_file = out_lta_file
+    reg.inputs.half_source = out_half_src_file
+    reg.inputs.half_source_xfm = out_half_src_lta_file
+    reg.inputs.half_targ = out_half_tgt_file
+    reg.inputs.half_targ_xfm = out_half_tgt_lta_file
+    reg.inputs.est_int_scale = True
+    reg.inputs.auto_sens = True
+    reg.run()
+
+
+def freesurfer_resample_volumes(source: typing.Union[str, pathlib.Path], target: typing.Union[str, pathlib.Path], lta_file: typing.Union[str, pathlib.Path], 
+                                output_file: typing.Union[str, pathlib.Path], interp:str='nearest') -> None:
+    applyreg = ApplyVolTransform()
+    applyreg.inputs.source_file = source
+    applyreg.inputs.lta_file = lta_file
+    applyreg.inputs.target_file = target
+    applyreg.inputs.interp = 'nearest'
+    applyreg.inputs.transformed_file = output_file
+    applyreg.run()
