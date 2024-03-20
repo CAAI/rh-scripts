@@ -4,8 +4,16 @@ import os
 import itertools
 import numpy as np
 import sys, random, typing, time, pydicom
+import pathlib
+import typing
 from pathlib import Path
 import pandas as pd
+import torchio as tio
+from scipy.ndimage import binary_dilation
+from skimage import measure
+from rhscripts import nifty as RHnifty
+import tempfile
+
 
 def listdir_nohidden(path):
     """List dir without hidden files
@@ -462,3 +470,169 @@ class LMParser:
     def __print( self, message : str):
         if self.verbose:
             print( message )
+
+def cluster_analysis_serial_data(baseline: typing.Union[str, pathlib.Path, tio.IMAGE], followup: typing.Union[str, pathlib.Path, tio.IMAGE],
+                                 baseline_target: typing.Union[str, pathlib.Path, None], baseline_lta_file: typing.Union[str, pathlib.Path, None],
+                                 followup_target: typing.Union[str, pathlib.Path, None], followup_lta_file: typing.Union[str, pathlib.Path, None],
+                                 minimum_allowed_size_in_mm3: float=None, binary_dilation_steps_pr_cluster: int=1, 
+                                 enlarged_percentage_threshold: float=0, return_longitudinal_file: bool=True,
+                                 save_path_baseline_cc=None, save_path_followup_cc=None,
+                                 save_path_baseline_cluster_halfspace=None, save_path_followup_cluster_halfspace=None):
+
+    # Read files if they are not
+    if type(baseline) in (str, pathlib.Path):
+        baseline = tio.LabelMap(baseline)
+    if type(followup) in (str, pathlib.Path):
+        followup = tio.LabelMap(followup)
+
+    if baseline_target is not None or followup_target is not None:
+        temp_dir_object = tempfile.TemporaryDirectory()
+        temp_dir = Path(temp_dir_object.name)
+    
+    spacings = []
+    cluster_masks = []
+    cluster_masks_orig = []
+    volumes = []
+    for ind, (tio_mask, target, lta_file) in enumerate(zip([baseline, followup], [baseline_target, followup_target], [baseline_lta_file, followup_lta_file])):
+        mask_arr = tio_mask.numpy()[0]
+        volume = {}
+        mask_spacing = tio_mask.spacing
+        spacings.append(mask_spacing)
+        mask_cc = measure.label(mask_arr)
+        
+        unique, counts = np.unique(mask_cc, return_counts=True)
+
+        for les in unique:
+            if les == 0:
+                continue
+            les_size = counts[np.where((unique==les))] * mask_spacing[0]* mask_spacing[1]*mask_spacing[2] 
+            if les_size < minimum_allowed_size_in_mm3: 
+                mask_arr[np.where((mask_cc == les))] = 0
+                mask_cc[np.where((mask_cc==les))] = 0
+            else:
+                volume[les] = les_size[0]
+        volumes.append(volume)
+        cluster_masks_orig.append(mask_cc)
+        mask_arr[np.where((mask_cc == 0))] = 0 # Needed?
+
+        # Save mask
+        if ind==0:
+            # Baseline
+            binary_in_ptspace = temp_dir / 'source_bin_ptspace.nii.gz' if save_path_baseline_cc is None else save_path_baseline_cc
+        else:
+            binary_in_ptspace = temp_dir / 'target_bin_ptspace.nii.gz' if save_path_followup_cc is None else save_path_followup_cc
+        tio.LabelMap(tensor=np.expand_dims(mask_arr,0), affine=tio_mask.affine).save(binary_in_ptspace)
+     
+        # Save mask and cc in halfspace if target and lta_file is supplied
+        if target is not None and lta_file is not None:
+            # Resample to halfspace
+            binary_in_halfspace = temp_dir / 'source_bin_halfspace.nii.gz' if ind == 0 else temp_dir / 'target_bin_halfspace.nii.gz'
+            RHnifty.freesurfer_resample_volumes(source=binary_in_ptspace, target=target, lta_file=lta_file, output_file=binary_in_halfspace, interp='nearest')
+
+            # Save cluster
+            cluster_in_ptspace = temp_dir / 'source_cluster_ptspace.nii.gz' if ind == 0 else temp_dir / 'target_cluster_ptspace.nii.gz'
+            tio.LabelMap(tensor=np.expand_dims(mask_cc,0).astype(mask_arr.dtype), affine=tio_mask.affine).save(cluster_in_ptspace)
+            if ind == 0:
+                # Baseline
+                cluster_in_halfspace = temp_dir / 'source_cluster_halfspace.nii.gz' if save_path_baseline_cluster_halfspace is None else save_path_baseline_cluster_halfspace
+            else:
+                # Followup
+                cluster_in_halfspace = temp_dir / 'target_cluster_halfspace.nii.gz' if save_path_followup_cluster_halfspace is None else save_path_followup_cluster_halfspace
+            print(mask_cc.dtype, mask_arr.dtype)
+            RHnifty.freesurfer_resample_volumes(source=cluster_in_ptspace, target=target, lta_file=lta_file, output_file=cluster_in_halfspace, interp='nearest')
+
+            cluster_masks.append(tio.LabelMap(cluster_in_halfspace).numpy()[0])
+        else:
+            cluster_masks.append(mask_cc)
+        
+    cluster1 = cluster_masks[0]
+    cluster2 = cluster_masks[1]
+
+    # Mapping clusters to each other
+    remap_dict = [{},{}]
+    remap_dict_vol = [{},{}]
+    for cluster_id, (cluster, other_cluster) in enumerate(zip([cluster1, cluster2],[cluster2,cluster1])):
+        for label_id in np.unique(cluster):
+            if label_id == 0:
+                continue
+
+            cluster_single_label = cluster==label_id 
+            cluster_single_label_dilated = binary_dilation(cluster_single_label.astype('int8'), iterations=binary_dilation_steps_pr_cluster)
+
+            if (overlap_sum := np.sum(other_cluster[cluster_single_label_dilated]>0)) > 0:
+                # We have overlap
+                remap_dict[cluster_id][label_id] = [u for u in np.unique(other_cluster[cluster_single_label_dilated]) if u > 0]
+                remap_dict_vol[cluster_id][label_id] = overlap_sum
+
+    # Building longi file
+    mask_longi = np.zeros_like(cluster_masks_orig[1])
+    processed_label_ids = []
+    number_of_clusters = 0
+    number_of_new_lesions=0
+    number_of_enlarged_lesions=0
+    df_lesions = pd.DataFrame(columns=['label_id','volume_baseline','volume_followup','percentage_difference'])
+    for label_id, label_vol in volumes[1].items():
+        if label_id in remap_dict[1].keys():
+            
+            vol_0 = np.sum([volumes[0][_label_id] for _label_id in remap_dict[1][label_id]])
+
+            # Add volume of other labels that are relabeled to this one
+            grouped_label_ids = []
+            for _label_id_in_0 in remap_dict[1][label_id]:
+                grouped_label_ids = grouped_label_ids + remap_dict[0][_label_id_in_0]
+            grouped_label_ids = list(np.unique(grouped_label_ids))
+
+            if label_id in processed_label_ids:
+                continue
+            print(label_id,"existing")
+            number_of_clusters+=1
+            processed_label_ids = processed_label_ids + grouped_label_ids
+            
+            vol_1 = np.sum([volumes[1][_label_id] for _label_id in grouped_label_ids]) 
+            perc=vol_1/vol_0
+
+            df_lesions = pd.concat([df_lesions, pd.DataFrame({
+                'label_id': label_id,
+                'volume_baseline': vol_0,
+                'volume_followup': vol_1,
+                'percentage_difference': np.round((perc-1)*100,1)
+            }, index=[0])], ignore_index=True)
+
+            
+            for _label_id in grouped_label_ids:
+                if (perc)>(1+enlarged_percentage_threshold):
+                    # Enlarged by 70%
+                    if _label_id == label_id:
+                        #print("\tEnlarged from",vol_0,"to",vol_1,f"({(perc-1)*100})")
+                        pass
+                    mask_longi[cluster_masks_orig[1]==_label_id] = 7
+                    number_of_enlarged_lesions+=1                    
+                else:
+                    mask_longi[cluster_masks_orig[1]==_label_id] = 5
+        else:
+            # print(label_id,"new with volume:", label_vol)
+            mask_longi[cluster_masks_orig[1]==label_id] = 6
+            number_of_clusters+=1
+            number_of_new_lesions+=1
+            df_lesions = pd.concat([df_lesions, pd.DataFrame({
+                'label_id': label_id,
+                'volume_followup': volumes[1][label_id],
+            }, index=[0])], ignore_index=True)
+
+    # Add volumes that are missing in followup
+    for label_id, label_vol in volumes[0].items():
+        if not label_id in remap_dict[0].keys():
+            df_lesions = pd.concat([df_lesions, pd.DataFrame({
+                'volume_baseline': label_vol
+            }, index=[0])], ignore_index=True)
+
+    # Clean up
+    temp_dir_object.cleanup()
+
+    if return_longitudinal_file:
+        longitudinal_file = tio.LabelMap(tensor=np.expand_dims(mask_longi,0).astype('uint8'), affine=followup.affine)
+        return df_lesions, longitudinal_file
+    else:
+        return df_lesions
+
+    

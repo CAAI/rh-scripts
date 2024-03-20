@@ -362,7 +362,11 @@ def reorient_to_std(in_file: typing.Union[str, pathlib.Path], out_file: typing.U
 """ Wrapper to mri_robust_register """
 def freesurfer_align_volumes_in_common_space(source: typing.Union[str, pathlib.Path], target: typing.Union[str, pathlib.Path], out_lta_file: typing.Union[str, pathlib.Path, None], 
                                              out_half_src_file: typing.Union[str, pathlib.Path, None], out_half_src_lta_file: typing.Union[str, pathlib.Path, None],
-                                             out_half_tgt_file: typing.Union[str, pathlib.Path, None], out_half_tgt_lta_file: typing.Union[str, pathlib.Path, None]) -> None:
+                                             out_half_tgt_file: typing.Union[str, pathlib.Path, None], out_half_tgt_lta_file: typing.Union[str, pathlib.Path, None],
+                                             affine: bool=False, transonly: bool=False) -> None:
+    if affine and transonly:
+        raise ValueError('Cannot set both affine and transonly flag. Choose one')
+    
     reg = RobustRegister()
     reg.inputs.source_file = source
     reg.inputs.target_file = target
@@ -373,6 +377,10 @@ def freesurfer_align_volumes_in_common_space(source: typing.Union[str, pathlib.P
     reg.inputs.half_targ_xfm = out_half_tgt_lta_file
     reg.inputs.est_int_scale = True
     reg.inputs.auto_sens = True
+    if transonly:
+        reg.inputs.trans_only = True
+    if affine:
+        reg.inputs.args = '--affine'
     reg.run()
 
 """ Wrapper to mri_vol2vol """
