@@ -28,7 +28,8 @@ setup(
              'conversion/rtdose2mnc.py',
              'conversion/hu2lac.py',
              'conversion/lac2hu.py',
-             'utils/lmparser.py'
+             'utils/lmparser.py',
+             'utils/dice_score.py'
      ],
      packages=find_packages(),
      install_requires=[
