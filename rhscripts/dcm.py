@@ -990,6 +990,10 @@ def read_rtx( dcmfile: str, img_size: Tuple[int,int,int],
         for ROI_id,ROI in enumerate(ROIs):
 
             data = np.zeros(img_size)
+            if 'ContourSequence' not in ROI:
+                if verbose:
+                    print(" --> ROI did not have any contour sequences. Is it perhaps not a connected component??")
+                continue
             contour_sequences = ROI.ContourSequence
             contour_points = {}
 
@@ -1108,6 +1112,10 @@ def read_rtx_v2(dcmfile: str, img_size: Tuple[int, int, int],
         for ROI_id, ROI in enumerate(ROIs):
 
             data = np.zeros(img_size)
+            if 'ContourSequence' not in ROI:
+                if verbose:
+                    print(" --> ROI did not have any contour sequences. Is it perhaps not a connected component??")
+                continue
             contour_sequences = ROI.ContourSequence
             contour_points = {}
 
@@ -1206,6 +1214,10 @@ def read_rtx_v3( dcmfile: str, img_size: Tuple[int,int,int],
         for ROI_id,ROI in enumerate(ROIs):
 
             data = np.zeros(img_size)
+            if 'ContourSequence' not in ROI:
+                if verbose:
+                    print(" --> ROI did not have any contour sequences. Is it perhaps not a connected component??")
+                continue
             contour_sequences = ROI.ContourSequence
             contour_points = {}
 
