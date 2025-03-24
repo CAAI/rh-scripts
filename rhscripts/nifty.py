@@ -13,6 +13,23 @@ from nipype.interfaces.freesurfer import RobustRegister, ApplyVolTransform
 import typing
 import pathlib
 import os
+import nibabel as nib
+
+
+def load_nii(path, target_orientation=('R','A','S'), reorient=True, return_image_only=True):
+    img = nib.load(path)
+ 
+    if reorient and not nib.aff2axcodes(img.affine) == target_orientation:
+        ornt_orig = nib.orientations.io_orientation(img.affine)
+        ornt_targ = nib.orientations.axcodes2ornt(''.join(target_orientation))
+        transform = nib.orientations.ornt_transform(ornt_orig, ornt_targ)
+ 
+        img = img.as_reoriented(transform)
+ 
+    if return_image_only:
+        return img.get_fdata()
+    else:
+        return img
 
 ######################################################################################################
 #################################   Registration utilities   ##########################################
