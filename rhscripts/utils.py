@@ -42,6 +42,8 @@ def bbox_ND(img):
 class LMParser:
     """ LMParser
 
+    Inspired by: https://www.siemens-healthineers.com/en-us/molecular-imaging/petlink-documents
+
     # Logic is used by lmparser.py
 
     ### You can also load in this function to other script, e.g. this simple case:
