@@ -237,13 +237,14 @@ def to_dcm(np_array,
     if from_type == 'minc' and not is_4D:
         totalSlicesInArray = np_array.shape[0]
     if from_type == 'nifty' and is_4D:
-        sys.exit('Nifty 4D conversion not yet implemented')
+        assert len(np_array.shape) == 4, "Numpy array must be 4D for nifty conversion with 4D dicom container"
+        totalSlicesInArray = np_array.shape[2]*np_array.shape[3]
     if (from_type == 'nifty' or from_type == 'torchio') and not is_4D:
         totalSlicesInArray = np_array.shape[2]
 
     if verbose:
         print("Checkinf if the number of files ( {} ) equals number of slices ( {} )".format(len(dcm_slices), totalSlicesInArray))
-    assert len(dcm_slices) == totalSlicesInArray
+    assert len(dcm_slices) == totalSlicesInArray, "Number of files (%d) does not match number of slices (%d) in the numpy array. Please check the input." % (len(dcm_slices), totalSlicesInArray)
 
     ## Prepare for MODIFY HEADER
     newSIUID = generate_SeriesInstanceUID()
@@ -275,7 +276,8 @@ def to_dcm(np_array,
         elif from_type == 'torchio' and not is_4D:
             data_slice = np_array[:, :, i].astype('double')
         elif from_type == 'nifty' and is_4D:
-            sys.exit('Nifty 4D conversion not yet implemented')
+            assert ds.pixel_array.shape == (np_array.shape[0],np_array.shape[1]), "Shape of the nifty array ({}) does not match the shape of the dicom slice {}".format(np_array.shape, ds.pixel_array.shape)
+            data_slice = np_array[:, :, i % numberofslices, i // numberofslices].astype('double')
         else:
             sys.exit('You must specify a from_type when using to_dcm function')
 
