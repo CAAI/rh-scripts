@@ -20,8 +20,6 @@ def load_nii(path, target_orientation=('R','A','S'), reorient=True, return_image
     
     try:
         img = nib.load(path)
-        
-        #print(f'Original orientation: {nib.aff2axcodes(img.affine)}')
     
         if reorient and not nib.aff2axcodes(img.affine) == target_orientation:
             ornt_orig = nib.orientations.io_orientation(img.affine)
@@ -29,8 +27,6 @@ def load_nii(path, target_orientation=('R','A','S'), reorient=True, return_image
             transform = nib.orientations.ornt_transform(ornt_orig, ornt_targ)
     
             img = img.as_reoriented(transform)
-            
-            #print(f'Reoriented orientation: {nib.aff2axcodes(img.affine)}')
     
         if return_image_only:
             return img.get_fdata()
