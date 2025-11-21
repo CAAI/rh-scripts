@@ -252,7 +252,7 @@ def get_suv_constants(
     
     """
     if isinstance(file, (str, Path)):
-        ds = dcmread(file)
+        ds = dcmread(file, stop_before_pixels=True)
     else:
         ds = file
 
