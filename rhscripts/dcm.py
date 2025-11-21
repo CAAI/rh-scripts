@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, math
+import os
+import math
 import pydicom as dicom
 import configparser
 import glob
