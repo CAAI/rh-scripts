@@ -261,14 +261,8 @@ def get_suv_constants(
 
     # Scan time
     if time_tag == 'series':
-        # Series time
-        try:
-            acq_time = ds[0x0008,0x0031].value
-        except KeyError as e:  # fall back on acq time if series times isn't available
-            acq_time = ds.AcquisitionTime
-            print(f"Warning: Falling back to Acquisition Time (0008,0032)! The selected DICOM file or dataset does not have the Series Time (0008,0031) available: {e}")
+        acq_time = ds[0x0008,0x0031].value  # Series time
     elif time_tag == 'acquisition':
-        # Acquisition time
         acq_time = ds.AcquisitionTime
     else:
         raise ValueError("'time_tag' must be 'series' or 'acquisition'")
