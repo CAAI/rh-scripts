@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, math
+import os
+import math
 import pydicom as dicom
 import configparser
 import glob
@@ -227,13 +228,20 @@ class Anonymize:
 
 def get_suv_constants(
     file:Union[str, Path, dicom.Dataset],
-    overwrite_values:Dict=None
+    overwrite_values:Dict=None,
+    time_tag:str='series'
 ) -> Tuple[Dict, Callable[[float], float]]:
     """ Extract the constants used for SUV normalization
     Parameters
     ----------
     file: 
         Path to string with dicom dataset, or pre-loaded dicom dataset
+    time_tag:
+        DICOM tag to base time calculation on. Can be either `series` or `acquisition`
+
+        `series` (default): Use Series Time tag `(0008,0031)`. **Reccomended method**, as this does not change if a PET scan has multiple views
+
+        `acquisition`: Uses Acquisition Time tag `(0008,0032)`. This is not always the correct time for SUV-bw calculations.
     
     Returns
     -------
@@ -244,7 +252,7 @@ def get_suv_constants(
     
     """
     if isinstance(file, (str, Path)):
-        ds = dcmread(file)
+        ds = dcmread(file, stop_before_pixels=True)
     else:
         ds = file
 
@@ -252,7 +260,12 @@ def get_suv_constants(
     inj_time = ds[0x54,0x16][0][0x18,0x1072].value
 
     # Scan time
-    acq_time = ds.AcquisitionTime
+    if time_tag == 'series':
+        acq_time = ds[0x0008,0x0031].value  # Series time
+    elif time_tag == 'acquisition':
+        acq_time = ds.AcquisitionTime
+    else:
+        raise ValueError("'time_tag' must be 'series' or 'acquisition'")
 
     # Injected dose
     dose = int(ds[0x54,0x16][0][0x18,0x1074].value)
